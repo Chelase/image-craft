@@ -1,5 +1,7 @@
 # Image Craft
 
+> English | [中文](README_CN.md)
+
 A universal skill for AI agents to generate and edit images using OpenAI-compatible GPT image APIs.
 
 ## Features
