@@ -1,13 +1,13 @@
-# Right Codes Image Skill
+# Image Craft
 
-A skill for AI agents to generate and edit images using the Right Codes GPT Image API.
+A universal skill for AI agents to generate and edit images using OpenAI-compatible GPT image APIs.
 
 ## Features
 
 - **Text-to-image generation**: Create images from text prompts
 - **Image transformation**: Edit existing images with text instructions
 - **Multiple interfaces**: Both PowerShell and Python scripts included
-- **OpenAI-compatible API**: Works with the Right Codes API endpoint
+- **OpenAI-compatible API**: Works with Right Codes, OpenAI, Azure, and other compatible endpoints
 
 ## Installation
 
@@ -15,7 +15,7 @@ A skill for AI agents to generate and edit images using the Right Codes GPT Imag
 
 1. Clone this repository to your skills directory:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/right-codes-image.git ~/.agents/skills/right-codes-image
+   git clone https://github.com/Chelase/image-craft.git ~/.agents/skills/image-craft
    ```
 
 2. Configure your API key (see [Configuration](#configuration))
@@ -40,8 +40,8 @@ Create a `private_config.json` file in the skill root directory:
 Or set environment variables:
 
 ```bash
-export RIGHT_CODES_API_KEY="your-api-key"
-export RIGHT_CODES_BASE_URL="https://right.codes/draw"  # Optional, defaults to https://right.codes/draw
+export IMAGE_CRAFT_API_KEY="your-api-key"
+export IMAGE_CRAFT_BASE_URL="https://right.codes/draw"  # Optional
 ```
 
 **Priority order:**
@@ -55,20 +55,20 @@ export RIGHT_CODES_BASE_URL="https://right.codes/draw"  # Optional, defaults to 
 
 ```powershell
 # Generate an image
-pwsh -File scripts/right_codes_image.ps1 -Command generate -Prompt "一只可爱的猫咪" -Output outputs/cat.png
+pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "一只可爱的猫咪" -Output outputs/cat.png
 
 # Transform an image
-pwsh -File scripts/right_codes_image.ps1 -Command transform -Prompt "改成水彩画风" -InputImage input.png -Output outputs/watercolor.png
+pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage input.png -Output outputs/watercolor.png
 ```
 
 ### Python
 
 ```bash
 # Generate an image
-python scripts/right_codes_image.py generate --prompt "一只可爱的猫咪" --output outputs/cat.png
+python scripts/image_craft.py generate --prompt "一只可爱的猫咪" --output outputs/cat.png
 
 # Transform an image
-python scripts/right_codes_image.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
+python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
 ```
 
 ## Models

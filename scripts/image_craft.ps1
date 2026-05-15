@@ -23,7 +23,7 @@ function Get-SkillDirectory {
     Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 }
 
-function Get-RightCodesConfig {
+function Get-ImageCraftConfig {
     $skillDir = Get-SkillDirectory
     $configPath = Join-Path $skillDir "private_config.json"
     $config = @{}
@@ -34,7 +34,7 @@ function Get-RightCodesConfig {
 
     $baseUrl = $BaseUrl
     if ([string]::IsNullOrWhiteSpace($baseUrl)) {
-        $baseUrl = $env:RIGHT_CODES_BASE_URL
+        $baseUrl = $env:IMAGE_CRAFT_BASE_URL
     }
     if ([string]::IsNullOrWhiteSpace($baseUrl)) {
         $baseUrl = $config.base_url
@@ -43,12 +43,12 @@ function Get-RightCodesConfig {
         $baseUrl = "https://right.codes/draw"
     }
 
-    $apiKey = $env:RIGHT_CODES_API_KEY
+    $apiKey = $env:IMAGE_CRAFT_API_KEY
     if ([string]::IsNullOrWhiteSpace($apiKey)) {
         $apiKey = $config.api_key
     }
     if ([string]::IsNullOrWhiteSpace($apiKey)) {
-        throw "Missing API key. Set RIGHT_CODES_API_KEY or create private_config.json in the skill directory."
+        throw "Missing API key. Set IMAGE_CRAFT_API_KEY or create private_config.json in the skill directory."
     }
 
     [pscustomobject]@{
@@ -234,7 +234,7 @@ function Save-ImageUrl {
     $resolvedOutput
 }
 
-$config = Get-RightCodesConfig
+$config = Get-ImageCraftConfig
 
 if ($Command -eq "generate") {
     $payload = @{

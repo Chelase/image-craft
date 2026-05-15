@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Call the Right Codes image API and save the returned image."""
+"""Call the Image Craft API and save the returned image."""
 
 from __future__ import annotations
 
@@ -29,12 +29,12 @@ def load_config() -> dict:
     if config_path.exists():
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
-    base_url = os.environ.get("RIGHT_CODES_BASE_URL") or config.get("base_url") or DEFAULT_BASE_URL
-    api_key = os.environ.get("RIGHT_CODES_API_KEY") or config.get("api_key")
+    base_url = os.environ.get("IMAGE_CRAFT_BASE_URL") or config.get("base_url") or DEFAULT_BASE_URL
+    api_key = os.environ.get("IMAGE_CRAFT_API_KEY") or config.get("api_key")
 
     if not api_key:
         raise SystemExit(
-            "Missing API key. Set RIGHT_CODES_API_KEY or create private_config.json in the skill directory."
+            "Missing API key. Set IMAGE_CRAFT_API_KEY or create private_config.json in the skill directory."
         )
 
     return {"base_url": base_url.rstrip("/"), "api_key": api_key}
@@ -135,7 +135,7 @@ def transform(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate or transform images with the Right Codes image API.")
+    parser = argparse.ArgumentParser(description="Generate or transform images with the Image Craft API.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     generate_parser = subparsers.add_parser("generate", help="Generate an image from text.")
