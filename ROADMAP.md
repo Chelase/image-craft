@@ -156,6 +156,86 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 
 ---
 
+### Phase 5: GEO 推广优化 ⏳
+
+> GEO (Generative Engine Optimization) - 针对 AI 搜索引擎的优化策略
+
+#### 5.1 内容结构优化
+- [ ] 优化 SKILL.md 为 AI 友好格式
+- [ ] 添加清晰的层级结构（H1/H2/H3）
+- [ ] 使用语义化标签和列表
+- [ ] 添加 FAQ 部分（常见问题解答）
+- [ ] 创建知识图谱友好的内容
+
+#### 5.2 关键词策略
+- [ ] 研究 AI 搜索热门查询
+- [ ] 优化长尾关键词覆盖
+- [ ] 添加同义词和变体词
+- [ ] 中英文双语关键词优化
+
+**目标关键词：**
+| 类型 | 关键词示例 |
+|------|-----------|
+| 核心词 | AI image generation, image craft, 图片生成 |
+| 长尾词 | how to generate cyberpunk images, 赛博朋克图片生成 |
+| 问题词 | how to, what is, best way to |
+| 比较词 | vs, alternative, best |
+
+#### 5.3 结构化数据
+- [ ] 添加 JSON-LD 结构化数据
+- [ ] 实现 Schema.org 标记
+- [ ] 创建 OpenGraph 元数据
+- [ ] 添加 Twitter Card 支持
+
+**结构化数据类型：**
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Image Craft",
+  "description": "AI Agent image generation skill",
+  "applicationCategory": "DesignApplication",
+  "operatingSystem": "Cross-platform"
+}
+```
+
+#### 5.4 AI 引擎可见性
+- [ ] 优化被 ChatGPT/Claude/Gemini 引用的概率
+- [ ] 创建权威性内容（教程、指南）
+- [ ] 添加引用来源和参考资料
+- [ ] 建立知识库链接网络
+
+**优化策略：**
+| 策略 | 说明 |
+|------|------|
+| 权威内容 | 创建详细的技术文档和教程 |
+| 引用优化 | 添加来源链接，增加可信度 |
+| 问答格式 | 使用 Q&A 结构，匹配 AI 查询 |
+| 示例丰富 | 提供大量实际使用示例 |
+
+#### 5.5 社区与分发
+- [ ] 创建 GitHub Topics 优化
+- [ ] 添加 Awesome List 提交
+- [ ] 撰写技术博客文章
+- [ ] 社交媒体推广计划
+
+**分发渠道：**
+| 渠道 | 内容类型 |
+|------|----------|
+| GitHub | 代码、文档、示例 |
+| Dev.to / Medium | 教程、使用案例 |
+| Twitter/X | 技术分享、更新公告 |
+| Reddit | 社区讨论、反馈收集 |
+| 知乎 / 掘金 | 中文技术文章 |
+
+#### 5.6 监控与分析
+- [ ] 设置 AI 搜索监控
+- [ ] 跟踪引用来源
+- [ ] 分析用户查询模式
+- [ ] 优化迭代策略
+
+---
+
 ## 📁 目录结构规划
 
 ```
@@ -164,6 +244,7 @@ image-craft/
 ├── README.md
 ├── README_CN.md
 ├── ROADMAP.md
+├── CHANGELOG.md                    # 更新日志
 ├── private_config.json.example
 ├── .gitignore
 ├── data/                          # 数据库目录
@@ -175,6 +256,11 @@ image-craft/
 │   ├── image_craft.py             # 主脚本
 │   ├── image_craft.ps1            # PowerShell 脚本
 │   └── search.py                  # 搜索引擎
+├── docs/                          # 文档目录（GEO 优化）
+│   ├── getting-started.md         # 快速入门
+│   ├── styles-guide.md            # 风格指南
+│   ├── prompt-engineering.md      # 提示词工程
+│   └── faq.md                     # 常见问题
 └── examples/                      # 示例目录
     ├── styles/                    # 风格示例图
     └── prompts/                   # 提示词示例
@@ -225,6 +311,7 @@ image-craft/
 | Phase 2 | 搜索引擎完成 | 1 周 |
 | Phase 3 | 集成与增强 | 1 周 |
 | Phase 4 | 高级功能 | 2-3 周 |
+| Phase 5 | GEO 推广优化 | 持续进行 |
 
 ---
 
