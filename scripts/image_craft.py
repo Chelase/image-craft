@@ -31,13 +31,14 @@ def load_config() -> dict:
 
     base_url = os.environ.get("IMAGE_CRAFT_BASE_URL") or config.get("base_url") or DEFAULT_BASE_URL
     api_key = os.environ.get("IMAGE_CRAFT_API_KEY") or config.get("api_key")
+    model = os.environ.get("IMAGE_CRAFT_MODEL") or config.get("model") or DEFAULT_MODEL
 
     if not api_key:
         raise SystemExit(
             "Missing API key. Set IMAGE_CRAFT_API_KEY or create private_config.json in the skill directory."
         )
 
-    return {"base_url": base_url.rstrip("/"), "api_key": api_key}
+    return {"base_url": base_url.rstrip("/"), "api_key": api_key, "model": model}
 
 
 def post_json(url: str, payload: dict, api_key: str) -> dict:
@@ -99,7 +100,8 @@ def save_image(image_b64: str, output: Path) -> None:
 
 def generate(args: argparse.Namespace) -> None:
     config = load_config()
-    payload = {"model": args.model, "prompt": args.prompt}
+    model = args.model or config["model"]
+    payload = {"model": model, "prompt": args.prompt}
     response = post_json(
         f"{config['base_url']}/v1/images/generations",
         payload,
@@ -107,13 +109,14 @@ def generate(args: argparse.Namespace) -> None:
     )
     image_b64, revised_prompt = extract_image_b64(response)
     save_image(image_b64, args.output)
-    print(json.dumps({"output": str(args.output), "revised_prompt": revised_prompt}, ensure_ascii=False))
+    print(json.dumps({"output": str(args.output), "model": model, "revised_prompt": revised_prompt}, ensure_ascii=False))
 
 
 def transform(args: argparse.Namespace) -> None:
     config = load_config()
+    model = args.model or config["model"]
     payload = {
-        "model": args.model,
+        "model": model,
         "messages": [
             {
                 "role": "user",
@@ -131,7 +134,7 @@ def transform(args: argparse.Namespace) -> None:
     )
     image_b64, revised_prompt = extract_image_b64(response)
     save_image(image_b64, args.output)
-    print(json.dumps({"output": str(args.output), "revised_prompt": revised_prompt}, ensure_ascii=False))
+    print(json.dumps({"output": str(args.output), "model": model, "revised_prompt": revised_prompt}, ensure_ascii=False))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -141,14 +144,14 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser = subparsers.add_parser("generate", help="Generate an image from text.")
     generate_parser.add_argument("--prompt", required=True)
     generate_parser.add_argument("--output", required=True, type=Path)
-    generate_parser.add_argument("--model", default=DEFAULT_MODEL)
+    generate_parser.add_argument("--model", default=None)
     generate_parser.set_defaults(func=generate)
 
     transform_parser = subparsers.add_parser("transform", help="Transform an input image with a text instruction.")
     transform_parser.add_argument("--prompt", required=True)
     transform_parser.add_argument("--input", required=True, type=Path)
     transform_parser.add_argument("--output", required=True, type=Path)
-    transform_parser.add_argument("--model", default=DEFAULT_MODEL)
+    transform_parser.add_argument("--model", default=None)
     transform_parser.set_defaults(func=transform)
 
     return parser

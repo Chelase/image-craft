@@ -12,7 +12,7 @@ param(
 
     [string]$InputImage,
 
-    [string]$Model = "gpt-image-2",
+    [string]$Model,
 
     [string]$BaseUrl
 )
@@ -51,9 +51,21 @@ function Get-ImageCraftConfig {
         throw "Missing API key. Set IMAGE_CRAFT_API_KEY or create private_config.json in the skill directory."
     }
 
+    $model = $Model
+    if ([string]::IsNullOrWhiteSpace($model)) {
+        $model = $env:IMAGE_CRAFT_MODEL
+    }
+    if ([string]::IsNullOrWhiteSpace($model)) {
+        $model = $config.model
+    }
+    if ([string]::IsNullOrWhiteSpace($model)) {
+        $model = "gpt-image-2"
+    }
+
     [pscustomobject]@{
         BaseUrl = $baseUrl.TrimEnd("/")
         ApiKey = $apiKey
+        Model = $model
     }
 }
 
@@ -238,7 +250,7 @@ $config = Get-ImageCraftConfig
 
 if ($Command -eq "generate") {
     $payload = @{
-        model = $Model
+        model = $config.Model
         prompt = $Prompt
     }
     $response = Invoke-RightCodesJson -Url "$($config.BaseUrl)/v1/images/generations" -Payload $payload -ApiKey $config.ApiKey
@@ -248,7 +260,7 @@ else {
         throw "-InputImage is required for transform."
     }
     $payload = @{
-        model = $Model
+        model = $config.Model
         messages = @(
             @{
                 role = "user"

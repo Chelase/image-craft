@@ -35,7 +35,8 @@ AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图�
 ```json
 {
   "api_key": "你的API密钥",
-  "base_url": "https://right.codes/draw"
+  "base_url": "https://right.codes/draw",
+  "model": "gpt-image-2"
 }
 ```
 
@@ -44,12 +45,14 @@ AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图�
 ```bash
 export IMAGE_CRAFT_API_KEY="你的API密钥"
 export IMAGE_CRAFT_BASE_URL="https://right.codes/draw"  # 可选
+export IMAGE_CRAFT_MODEL="gpt-image-2"                  # 可选
 ```
 
 **优先级顺序：**
-1. 脚本参数 (`-BaseUrl`)
-2. 环境变量
+1. 脚本参数 (`-Model`, `-BaseUrl`)
+2. 环境变量 (`IMAGE_CRAFT_MODEL`, `IMAGE_CRAFT_BASE_URL`)
 3. `private_config.json`
+4. 默认值 (`gpt-image-2`, `https://right.codes/draw`)
 
 ## 使用方法
 

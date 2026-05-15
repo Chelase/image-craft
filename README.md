@@ -35,7 +35,8 @@ Create a `private_config.json` file in the skill root directory:
 ```json
 {
   "api_key": "YOUR_API_KEY_HERE",
-  "base_url": "https://right.codes/draw"
+  "base_url": "https://right.codes/draw",
+  "model": "gpt-image-2"
 }
 ```
 
@@ -44,12 +45,14 @@ Or set environment variables:
 ```bash
 export IMAGE_CRAFT_API_KEY="your-api-key"
 export IMAGE_CRAFT_BASE_URL="https://right.codes/draw"  # Optional
+export IMAGE_CRAFT_MODEL="gpt-image-2"                  # Optional
 ```
 
 **Priority order:**
-1. Script parameters (`-BaseUrl`)
-2. Environment variables
+1. Script parameters (`-Model`, `-BaseUrl`)
+2. Environment variables (`IMAGE_CRAFT_MODEL`, `IMAGE_CRAFT_BASE_URL`)
 3. `private_config.json`
+4. Default values (`gpt-image-2`, `https://right.codes/draw`)
 
 ## Usage
 
