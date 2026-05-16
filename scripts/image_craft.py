@@ -16,7 +16,6 @@ from pathlib import Path
 
 
 DEFAULT_MODEL = "gpt-image-2"
-DEFAULT_BASE_URL = "https://right.codes/gpt"
 
 
 def skill_dir() -> Path:
@@ -29,13 +28,18 @@ def load_config() -> dict:
     if config_path.exists():
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
-    base_url = os.environ.get("IMAGE_CRAFT_BASE_URL") or config.get("base_url") or DEFAULT_BASE_URL
+    base_url = os.environ.get("IMAGE_CRAFT_BASE_URL") or config.get("base_url")
     api_key = os.environ.get("IMAGE_CRAFT_API_KEY") or config.get("api_key")
     model = os.environ.get("IMAGE_CRAFT_MODEL") or config.get("model") or DEFAULT_MODEL
 
+    if not base_url:
+        raise SystemExit(
+            "Missing base URL. Set IMAGE_CRAFT_BASE_URL, or add base_url to private_config.json."
+        )
+
     if not api_key:
         raise SystemExit(
-            "Missing API key. Set IMAGE_CRAFT_API_KEY or create private_config.json in the skill directory."
+            "Missing API key. Set IMAGE_CRAFT_API_KEY or add api_key to private_config.json."
         )
 
     return {"base_url": base_url.rstrip("/"), "api_key": api_key, "model": model}

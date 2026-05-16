@@ -7,11 +7,55 @@ description: Generate or edit images through the user's configured GPT image API
 
 Use this skill to call the user's configured GPT image API and save generated images as local files.
 
+## Prerequisites
+
+**Before using this skill, you MUST configure:**
+
+1. **API Key** - Required for authentication
+2. **Base URL** - Required API endpoint URL
+
+Without these configurations, the skill will not work.
+
 ## Capabilities
 
 - Text-to-image generation with `POST /v1/images/generations`.
 - Image transformation through the OpenAI-compatible chat endpoint with a data URL image input.
 - Optional direct API calls for custom payloads when the bundled script is too narrow.
+
+## Configuration
+
+### Required Settings
+
+Create a `private_config.json` file in this skill directory:
+
+```json
+{
+  "api_key": "YOUR_API_KEY_HERE",
+  "base_url": "https://your-api-endpoint.com"
+}
+```
+
+Or set environment variables:
+
+```bash
+export IMAGE_CRAFT_API_KEY="your-api-key"
+export IMAGE_CRAFT_BASE_URL="https://your-api-endpoint.com"
+```
+
+### Optional Settings
+
+```json
+{
+  "api_key": "YOUR_API_KEY_HERE",
+  "base_url": "https://your-api-endpoint.com",
+  "model": "gpt-image-2"
+}
+```
+
+**Configuration priority:**
+1. Script parameters (`-BaseUrl`, `-Model`)
+2. Environment variables (`IMAGE_CRAFT_BASE_URL`, `IMAGE_CRAFT_API_KEY`, `IMAGE_CRAFT_MODEL`)
+3. `private_config.json`
 
 ## Security
 
@@ -21,34 +65,35 @@ When reporting results, mention the output image path, model, and prompt summary
 
 ## Quick Start
 
-Use the bundled PowerShell script from this skill directory:
+**Step 1: Configure your API** (see [Configuration](#configuration))
 
+**Step 2: Use the script**
+
+PowerShell:
 ```powershell
 pwsh -File .\scripts\image_craft.ps1 -Command generate -Prompt "画一只可爱的猫咪" -Output .\outputs\cat.png
 ```
 
-For an image-to-image transformation:
+Python:
+```bash
+python scripts/image_craft.py generate --prompt "画一只可爱的猫咪" --output outputs/cat.png
+```
 
+For image-to-image transformation:
+
+PowerShell:
 ```powershell
 pwsh -File .\scripts\image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage .\input.png -Output .\outputs\watercolor.png
 ```
 
-Or use the Python script:
-
+Python:
 ```bash
-python scripts/image_craft.py generate --prompt "画一只可爱的猫咪" --output outputs/cat.png
 python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
 ```
 
-The script reads configuration in this order:
-
-1. `-BaseUrl` script parameter.
-2. `IMAGE_CRAFT_API_KEY` and `IMAGE_CRAFT_BASE_URL` environment variables.
-3. `private_config.json` in this skill directory.
-
 ## Model Selection
 
-Default model: `gpt-image-2`.
+Default model: `gpt-image-2` (can be configured via config file or environment variable).
 
 Available models:
 
@@ -59,19 +104,14 @@ If the user explicitly requests a model, honor it. Otherwise choose `gpt-image-2
 
 ## Workflow
 
-1. Create a clear prompt from the user's request. Preserve user-provided names, brands, languages, and style constraints.
-2. Choose `generate` for prompt-only requests and `transform` when the user provides an image path or image content to edit.
-3. Save outputs to a concrete image path. Use a descriptive filename and create the output directory if needed.
-4. Decode the returned `b64_json` or markdown data URL into the requested image file.
-5. Tell the user where the image was saved. Include a short note if the API returned a revised prompt.
+1. **Check configuration** - Ensure `base_url` and `api_key` are configured.
+2. Create a clear prompt from the user's request. Preserve user-provided names, brands, languages, and style constraints.
+3. Choose `generate` for prompt-only requests and `transform` when the user provides an image path or image content to edit.
+4. Save outputs to a concrete image path. Use a descriptive filename and create the output directory if needed.
+5. Decode the returned `b64_json` or markdown data URL into the requested image file.
+6. Tell the user where the image was saved. Include a short note if the API returned a revised prompt.
 
-## API Notes
-
-Default base URL:
-
-```text
-https://right.codes/draw
-```
+## API Endpoints
 
 Text-to-image endpoint:
 
@@ -120,6 +160,8 @@ Use a `messages` array with text plus an `image_url` item:
 
 ## Troubleshooting
 
-- If authentication fails, verify `private_config.json` or `IMAGE_CRAFT_API_KEY`.
+- **Missing API key or base URL**: Verify `private_config.json` or environment variables are set correctly.
+- **Authentication fails**: Check if `IMAGE_CRAFT_API_KEY` is correct and not expired.
+- **Connection fails**: Verify `IMAGE_CRAFT_BASE_URL` is correct and accessible.
 - The script supports `data[0].b64_json`, `data.url`, direct data URLs, and markdown image links such as `![image](data:image/png;base64,...)` or `![image](https://...)`.
 - If the network is blocked by the runtime, request permission to run the command with network access rather than trying to work around the restriction.

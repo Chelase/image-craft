@@ -40,7 +40,7 @@ function Get-ImageCraftConfig {
         $baseUrl = $config.base_url
     }
     if ([string]::IsNullOrWhiteSpace($baseUrl)) {
-        $baseUrl = "https://right.codes/draw"
+        throw "Missing base URL. Set IMAGE_CRAFT_BASE_URL, use -BaseUrl parameter, or add base_url to private_config.json."
     }
 
     $apiKey = $env:IMAGE_CRAFT_API_KEY
@@ -48,7 +48,7 @@ function Get-ImageCraftConfig {
         $apiKey = $config.api_key
     }
     if ([string]::IsNullOrWhiteSpace($apiKey)) {
-        throw "Missing API key. Set IMAGE_CRAFT_API_KEY or create private_config.json in the skill directory."
+        throw "Missing API key. Set IMAGE_CRAFT_API_KEY or add api_key to private_config.json."
     }
 
     $model = $Model

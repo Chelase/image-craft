@@ -11,6 +11,15 @@ AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图�
 - **多接口**: 同时支持 PowerShell 和 Python 脚本
 - **OpenAI 兼容**: 支持 Right Codes、OpenAI、Azure 等兼容端点
 
+## 前置要求
+
+**使用此技能前，你必须配置：**
+
+1. **API Key** - 用于身份验证
+2. **Base URL** - API 端点地址
+
+缺少这些配置，技能将无法工作。
+
 ## 安装
 
 ### OpenCode Agent
@@ -20,7 +29,7 @@ AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图�
    git clone https://github.com/Chelase/image-craft.git ~/.agents/skills/image-craft
    ```
 
-2. 配置 API Key（见[配置说明](#配置说明)）
+2. 配置 API（见[配置说明](#配置说明)）
 
 3. 当你请求生成图片时，技能会自动可用
 
@@ -30,13 +39,14 @@ AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图�
 
 ## 配置说明
 
+### 必需配置
+
 在技能根目录创建 `private_config.json` 文件：
 
 ```json
 {
   "api_key": "你的API密钥",
-  "base_url": "https://right.codes/draw",
-  "model": "gpt-image-2"
+  "base_url": "https://你的API端点.com"
 }
 ```
 
@@ -44,15 +54,28 @@ AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图�
 
 ```bash
 export IMAGE_CRAFT_API_KEY="你的API密钥"
-export IMAGE_CRAFT_BASE_URL="https://right.codes/draw"  # 可选
-export IMAGE_CRAFT_MODEL="gpt-image-2"                  # 可选
+export IMAGE_CRAFT_BASE_URL="https://你的API端点.com"
+```
+
+### 可选配置
+
+```json
+{
+  "api_key": "你的API密钥",
+  "base_url": "https://你的API端点.com",
+  "model": "gpt-image-2"
+}
+```
+
+```bash
+export IMAGE_CRAFT_MODEL="gpt-image-2"  # 可选，默认为 gpt-image-2
 ```
 
 **优先级顺序：**
 1. 脚本参数 (`-Model`, `-BaseUrl`)
-2. 环境变量 (`IMAGE_CRAFT_MODEL`, `IMAGE_CRAFT_BASE_URL`)
+2. 环境变量 (`IMAGE_CRAFT_MODEL`, `IMAGE_CRAFT_BASE_URL`, `IMAGE_CRAFT_API_KEY`)
 3. `private_config.json`
-4. 默认值 (`gpt-image-2`, `https://right.codes/draw`)
+4. 默认值（仅 `model` 有默认值：`gpt-image-2`）
 
 ## 使用方法
 
@@ -120,6 +143,12 @@ POST /v1/chat/completions
   ]
 }
 ```
+
+## 故障排除
+
+- **缺少 API Key 或 Base URL**：检查 `private_config.json` 或环境变量是否正确设置。
+- **认证失败**：检查 `IMAGE_CRAFT_API_KEY` 是否正确且未过期。
+- **连接失败**：检查 `IMAGE_CRAFT_BASE_URL` 是否正确且可访问。
 
 ## 安全说明
 

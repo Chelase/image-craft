@@ -11,6 +11,15 @@ A universal skill for AI agents to generate and edit images using OpenAI-compati
 - **Multiple interfaces**: Both PowerShell and Python scripts included
 - **OpenAI-compatible API**: Works with Right Codes, OpenAI, Azure, and other compatible endpoints
 
+## Prerequisites
+
+**Before using this skill, you MUST configure:**
+
+1. **API Key** - Required for authentication
+2. **Base URL** - Required API endpoint URL
+
+Without these configurations, the skill will not work.
+
 ## Installation
 
 ### For OpenCode Agents
@@ -20,7 +29,7 @@ A universal skill for AI agents to generate and edit images using OpenAI-compati
    git clone https://github.com/Chelase/image-craft.git ~/.agents/skills/image-craft
    ```
 
-2. Configure your API key (see [Configuration](#configuration))
+2. Configure your API (see [Configuration](#configuration))
 
 3. The skill will be automatically available when you ask to generate images
 
@@ -30,13 +39,14 @@ Copy the `SKILL.md` file content to your agent's skill system, and ensure the sc
 
 ## Configuration
 
+### Required Settings
+
 Create a `private_config.json` file in the skill root directory:
 
 ```json
 {
   "api_key": "YOUR_API_KEY_HERE",
-  "base_url": "https://right.codes/draw",
-  "model": "gpt-image-2"
+  "base_url": "https://your-api-endpoint.com"
 }
 ```
 
@@ -44,15 +54,28 @@ Or set environment variables:
 
 ```bash
 export IMAGE_CRAFT_API_KEY="your-api-key"
-export IMAGE_CRAFT_BASE_URL="https://right.codes/draw"  # Optional
-export IMAGE_CRAFT_MODEL="gpt-image-2"                  # Optional
+export IMAGE_CRAFT_BASE_URL="https://your-api-endpoint.com"
+```
+
+### Optional Settings
+
+```json
+{
+  "api_key": "YOUR_API_KEY_HERE",
+  "base_url": "https://your-api-endpoint.com",
+  "model": "gpt-image-2"
+}
+```
+
+```bash
+export IMAGE_CRAFT_MODEL="gpt-image-2"  # Optional, defaults to gpt-image-2
 ```
 
 **Priority order:**
 1. Script parameters (`-Model`, `-BaseUrl`)
-2. Environment variables (`IMAGE_CRAFT_MODEL`, `IMAGE_CRAFT_BASE_URL`)
+2. Environment variables (`IMAGE_CRAFT_MODEL`, `IMAGE_CRAFT_BASE_URL`, `IMAGE_CRAFT_API_KEY`)
 3. `private_config.json`
-4. Default values (`gpt-image-2`, `https://right.codes/draw`)
+4. Default values (only `model` has default: `gpt-image-2`)
 
 ## Usage
 
@@ -120,6 +143,12 @@ Request body:
   ]
 }
 ```
+
+## Troubleshooting
+
+- **Missing API key or base URL**: Verify `private_config.json` or environment variables are set correctly.
+- **Authentication fails**: Check if `IMAGE_CRAFT_API_KEY` is correct and not expired.
+- **Connection fails**: Verify `IMAGE_CRAFT_BASE_URL` is correct and accessible.
 
 ## Security
 
