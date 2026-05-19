@@ -30,6 +30,16 @@ from search import (
 
 DEFAULT_MODEL = "gpt-image-2"
 
+CATEGORY_DEFAULT_STYLE_IDS = {
+    "3d": "blender-render",
+    "digital": "cyberpunk",
+    "photography": "film-noir",
+    "illustration": "isometric",
+    "traditional": "oil-painting",
+    "effect": "double-exposure",
+    "special": "double-exposure",
+}
+
 
 def skill_dir() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -122,12 +132,23 @@ def resolve_style(style_name: str | None = None, style_id: str | None = None) ->
 
     styles = load_styles()
     if style_id:
+        normalized_style_id = style_id.lower().strip()
         for s in styles:
-            if s.get("id", "") == style_id:
+            if s.get("id", "") == normalized_style_id:
                 return s
+        default_style_id = CATEGORY_DEFAULT_STYLE_IDS.get(normalized_style_id)
+        if default_style_id:
+            for s in styles:
+                if s.get("id", "") == default_style_id:
+                    return s
     if style_name:
         # Search by name (supports Chinese and English)
         name_lower = style_name.lower()
+        default_style_id = CATEGORY_DEFAULT_STYLE_IDS.get(name_lower)
+        if default_style_id:
+            for s in styles:
+                if s.get("id", "") == default_style_id:
+                    return s
         for s in styles:
             if name_lower in s.get("name_cn", "").lower() or name_lower in s.get("name_en", "").lower():
                 return s
@@ -173,6 +194,10 @@ def render_template(template: dict, prompt: str, variables: dict[str, str]) -> s
     variable_names = [name.strip() for name in template.get("variables", "").split(",") if name.strip()]
     for name in variable_names:
         value = variables.get(name)
+        if value is None:
+            value = variables.get(name.replace(" ", "_"))
+        if value is None:
+            value = variables.get(name.replace(" ", "-"))
         if value is None and name in {"subject", "product", "location", "city", "items"}:
             value = prompt
         if value is not None:
@@ -341,6 +366,44 @@ def suggest(args: argparse.Namespace) -> None:
         print(format_color(color))
 
 
+def preview_prompt(args: argparse.Namespace) -> None:
+    """Print the final prompt payload without calling the image API."""
+    enhanced_prompt, negative_prompt, style = prepare_prompt(args)
+    prompt, template, color = apply_template_and_color(args)
+    output = {
+        "original_prompt": args.prompt,
+        "base_prompt": prompt,
+        "enhanced_prompt": enhanced_prompt,
+        "negative_prompt": negative_prompt or "",
+    }
+    if style:
+        output["style_id"] = style.get("id", "")
+        output["style_name_cn"] = style.get("name_cn", "")
+        output["style_name_en"] = style.get("name_en", "")
+    if template:
+        output["template_id"] = template.get("id", "")
+        output["template_name"] = template.get("name", "")
+    if color:
+        output["color_id"] = color.get("id", "")
+        output["color_name"] = color.get("name", "")
+
+    if args.format == "json":
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        return
+
+    print("=" * 60)
+    print("PROMPT PREVIEW")
+    print("=" * 60)
+    print(f"Original: {output['original_prompt']}")
+    print(f"Base:     {output['base_prompt']}")
+    print(f"Final:    {output['enhanced_prompt']}")
+    if output["negative_prompt"]:
+        print(f"Negative: {output['negative_prompt']}")
+    if style:
+        print(f"Style:    {output.get('style_name_cn', '')} ({output.get('style_id', '')})")
+    print("=" * 60)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate or transform images with the Image Craft API.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -384,6 +447,19 @@ def build_parser() -> argparse.ArgumentParser:
     sugg.add_argument("--random", action="store_true", help="Return random recommendations")
     sugg.add_argument("-f", "--format", choices=["text", "json"], default="text")
     sugg.set_defaults(func=suggest)
+
+    # ----- prompt preview -----
+    prev = subparsers.add_parser("prompt", help="Preview the enhanced prompt without generating an image.")
+    prev.add_argument("--prompt", required=True)
+    prev.add_argument("--style-id", default=None, help="Style ID or category to apply (e.g. blender-render or 3d)")
+    prev.add_argument("--style-name", default=None, help="Style name or category to search and auto-apply")
+    prev.add_argument("--template", default=None, help="Prompt template ID/name/query to render before preview")
+    prev.add_argument("--var", action="append", default=[], help="Template variable in key=value form; repeat as needed")
+    prev.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")
+    prev.add_argument("--negative", action="store_true", help="Include negative prompt")
+    prev.add_argument("--no-quality", action="store_true", help="Skip quality term injection")
+    prev.add_argument("-f", "--format", choices=["text", "json"], default="text")
+    prev.set_defaults(func=preview_prompt)
 
     return parser
 
