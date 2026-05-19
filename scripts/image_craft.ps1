@@ -1,20 +1,36 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("generate", "transform")]
+    [ValidateSet("generate", "transform", "suggest")]
     [string]$Command,
 
     [Parameter(Mandatory = $true)]
     [string]$Prompt,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$Output,
 
     [string]$InputImage,
 
     [string]$Model,
 
-    [string]$BaseUrl
+    [string]$BaseUrl,
+
+    [string]$StyleName,
+
+    [int]$Limit = 5,
+
+    [ValidateSet("style", "prompt", "color", "all")]
+    [string]$Domain = "style",
+
+    [string]$Category,
+
+    [ValidateSet("text", "json")]
+    [string]$Format = "text",
+
+    [switch]$DesignSystem,
+
+    [switch]$Random
 )
 
 $ErrorActionPreference = "Stop"
@@ -246,12 +262,112 @@ function Save-ImageUrl {
     $resolvedOutput
 }
 
+function Get-PythonCommand {
+    $candidates = @("python", "python3", "py")
+    foreach ($candidate in $candidates) {
+        $command = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($command) {
+            return $candidate
+        }
+    }
+    throw "Python is required for search integration. Install Python or use scripts/image_craft.py directly."
+}
+
+function Invoke-SearchScript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Query,
+
+        [string]$SearchDomain = "style",
+
+        [int]$SearchLimit = 5,
+
+        [string]$SearchCategory,
+
+        [string]$SearchFormat = "text"
+    )
+
+    $scriptPath = Join-Path $PSScriptRoot "search.py"
+    $python = Get-PythonCommand
+    $arguments = @($scriptPath)
+    if (-not [string]::IsNullOrWhiteSpace($Query)) {
+        $arguments += $Query
+    }
+    $arguments += @("--domain", $SearchDomain, "--limit", [string]$SearchLimit, "--format", $SearchFormat)
+    if (-not [string]::IsNullOrWhiteSpace($SearchCategory)) {
+        $arguments += @("--category", $SearchCategory)
+    }
+    if ($DesignSystem) {
+        $arguments += "--design-system"
+    }
+    if ($Random) {
+        $arguments += "--random"
+    }
+    & $python @arguments
+}
+
+function Get-StylePrompt {
+    param(
+        [string]$Subject,
+        [string]$Name
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        return $Subject
+    }
+
+    $skillDir = Get-SkillDirectory
+    $stylesPath = Join-Path $skillDir "data\styles.csv"
+    if (-not (Test-Path -LiteralPath $stylesPath)) {
+        return $Subject
+    }
+
+    $styles = Import-Csv -LiteralPath $stylesPath
+    $style = $styles | Where-Object {
+        $_.id -eq $Name -or $_.name_en -like "*$Name*" -or $_.name_cn -like "*$Name*"
+    } | Select-Object -First 1
+
+    if (-not $style) {
+        try {
+            $searchOutput = Invoke-SearchScript -Query $Name -SearchDomain "style" -SearchLimit 1 -SearchFormat "json"
+            $searchData = $searchOutput | ConvertFrom-Json
+            $styleMatches = @($searchData.styles)
+            if ($styleMatches.Count -gt 0) {
+                $style = $styleMatches[0]
+            }
+        }
+        catch {
+            $style = $null
+        }
+    }
+
+    if (-not $style) {
+        return $Subject
+    }
+
+    if ([string]::IsNullOrWhiteSpace($style.prompt_template)) {
+        return $Subject
+    }
+
+    $style.prompt_template.Replace("{subject}", $Subject)
+}
+
+if ($Command -eq "suggest") {
+    Invoke-SearchScript -Query $Prompt -SearchDomain $Domain -SearchLimit $Limit -SearchCategory $Category -SearchFormat $Format
+    return
+}
+
+if ([string]::IsNullOrWhiteSpace($Output)) {
+    throw "-Output is required for generate and transform."
+}
+
 $config = Get-ImageCraftConfig
+$finalPrompt = Get-StylePrompt -Subject $Prompt -Name $StyleName
 
 if ($Command -eq "generate") {
     $payload = @{
         model = $config.Model
-        prompt = $Prompt
+        prompt = $finalPrompt
     }
     $response = Invoke-RightCodesJson -Url "$($config.BaseUrl)/v1/images/generations" -Payload $payload -ApiKey $config.ApiKey
 }
@@ -267,7 +383,7 @@ else {
                 content = @(
                     @{
                         type = "text"
-                        text = $Prompt
+                        text = $finalPrompt
                     },
                     @{
                         type = "image_url"

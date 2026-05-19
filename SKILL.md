@@ -106,6 +106,70 @@ Available models:
 
 If the user explicitly requests a model, honor it. Otherwise choose `gpt-image-2` unless the prompt complexity clearly justifies `gpt-image-2-vip`.
 
+## Style System
+
+The skill includes 54 art styles across 8 categories. Styles, prompt templates, and color palettes are searched through the unified local backend in `scripts/search.py`.
+
+**Using a style by name:**
+
+```
+PowerShell:
+pwsh -File .\scripts\image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output .\outputs\cyberpunk.png
+pwsh -File .\scripts\image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
+
+Python:
+python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
+```
+
+**Using a style by ID:**
+
+```
+python scripts/image_craft.py generate --prompt "东京街头" --style-id "cyberpunk" --output outputs/cyberpunk.png
+```
+
+**Getting style suggestions (no image generated):**
+
+```
+python scripts/image_craft.py suggest "赛博朋克城市"
+
+# Search every domain and return JSON
+python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --format json
+
+# Ask for a full design-system recommendation
+python scripts/image_craft.py suggest "赛博朋克未来城市" --design-system
+```
+
+**Using prompt templates and color palettes:**
+
+```
+python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
+```
+
+**Available style categories:** traditional, digital, illustration, photography, 3d, special.
+
+## Prompt Enhancement
+
+All `generate` and `transform` commands automatically:
+
+1. **Quality term injection** — adds `masterpiece, best quality, high resolution, detailed, professional, trending on artstation` unless `--no-quality` is passed.
+2. **Negative prompt** — includes per-style negative terms plus general quality negatives (`lowres, bad anatomy, blurry, etc.`) when `--negative` is passed.
+3. **Style enhancement** — if a style is specified, the style's `prompt_template` field is merged with the user's prompt (replacing any `{subject}` placeholder).
+4. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
+5. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
+
+**Override defaults:**
+
+| Flag | Effect |
+|------|--------|
+| `--no-quality` | Skip quality term injection |
+| `--negative` | Include negative prompts |
+| `--style-id` or `--style-name` | Apply a style and its enhancement |
+| `--template` | Render a prompt template from the local template library |
+| `--var key=value` | Fill template variables; repeat as needed |
+| `--color` | Add a searched color palette description |
+| `suggest --domain style|prompt|color|all` | Search local style/template/color data without generating |
+| `suggest --design-system` | Return combined style + prompt + color recommendations |
+
 ## Workflow
 
 1. **Check configuration** - Ensure `base_url` and `api_key` are configured.

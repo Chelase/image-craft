@@ -87,6 +87,15 @@ pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "一只可爱的猫
 
 # 转换图片
 pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage input.png -Output outputs/watercolor.png
+
+# 使用风格生成（按名称）
+pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output outputs/cyberpunk.png
+
+# 获取风格建议
+pwsh -File scripts/image_craft.ps1 -Command suggest -Prompt "赛博朋克城市"
+
+# 获取机器可读的 JSON 建议
+pwsh -File scripts/image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
 ```
 
 ### Python
@@ -97,7 +106,39 @@ python scripts/image_craft.py generate --prompt "一只可爱的猫咪" --output
 
 # 转换图片
 python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
+
+# 使用风格生成（按名称或ID）
+python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
+
+# 包含负面提示词（避免常见缺陷）
+python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --negative --output outputs/cyberpunk.png
+
+# 获取风格建议
+python scripts/image_craft.py suggest "赛博朋克城市"
+
+# 以 JSON 搜索全部本地库
+python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --format json
+
+# 使用提示词模板和配色方案生成
+python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
+
+## 风格系统
+
+内置 54 种艺术风格，覆盖 8 个分类（传统、数码、插画、摄影、3D、特殊等）。所有命令自动注入质量关键词，可选包含负面提示词。
+
+使用 `--style-name` 或 `--style-id` 应用风格，使用 `suggest` 命令探索本地 `data/*.csv` 中的风格、提示词模板和配色方案。
+
+统一搜索后端支持：
+
+- `--domain style|prompt|color|all`
+- `--design-system` 返回风格 + 模板 + 配色组合建议
+- `--random` 随机推荐
+- `--format json` 输出机器可读结果
+
+## 提示词增强
+
+所有命令自动注入质量关键词（`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`）。添加 `--negative` 参数可包含负面提示词，避免常见缺陷（`lowres, bad anatomy, blurry` 等）。使用 `--template`、重复 `--var key=value` 和 `--color` 可在生成前渲染提示词模板并追加配色描述。
 
 ## 可用模型
 

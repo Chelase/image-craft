@@ -87,6 +87,15 @@ pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "一只可爱的猫
 
 # Transform an image
 pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage input.png -Output outputs/watercolor.png
+
+# Generate with a style (by name)
+pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output outputs/cyberpunk.png
+
+# Get style suggestions
+pwsh -File scripts/image_craft.ps1 -Command suggest -Prompt "赛博朋克城市"
+
+# Get machine-readable style suggestions
+pwsh -File scripts/image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
 ```
 
 ### Python
@@ -97,7 +106,39 @@ python scripts/image_craft.py generate --prompt "一只可爱的猫咪" --output
 
 # Transform an image
 python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
+
+# Generate with a style (by name or ID)
+python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
+
+# Include negative prompts (avoids common defects)
+python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --negative --output outputs/cyberpunk.png
+
+# Get style suggestions for a prompt
+python scripts/image_craft.py suggest "赛博朋克城市"
+
+# Search all local libraries as JSON
+python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --format json
+
+# Generate with a prompt template and color palette
+python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
+
+## Style System
+
+The skill includes 54 art styles across 8 categories (traditional, digital, illustration, photography, 3d, special). Styles are auto-enhanced with quality terms and per-style negative prompts.
+
+Use `--style-name` or `--style-id` to apply a style. Use `suggest` command to explore styles, prompt templates, and color palettes from the local `data/*.csv` libraries.
+
+The unified search backend supports:
+
+- `--domain style|prompt|color|all`
+- `--design-system` for combined style + template + palette recommendations
+- `--random` for random recommendations
+- `--format json` for machine-readable output
+
+## Prompt Enhancement
+
+All commands automatically inject quality terms (`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`). Pass `--negative` to include negative prompts that avoid common artifacts (`lowres, bad anatomy, blurry, etc.`). Use `--template`, repeated `--var key=value`, and `--color` to render prompt templates and append color palette descriptions before generation.
 
 ## Models
 

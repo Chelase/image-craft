@@ -14,6 +14,19 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from prompts_enhancer import enhance, is_simple_prompt, load_styles
+from search import (
+    format_color,
+    format_prompt,
+    format_style,
+    get_design_system,
+    get_random_colors,
+    get_random_prompts,
+    get_random_styles,
+    search_colors,
+    search_prompts,
+    search_styles,
+)
 
 DEFAULT_MODEL = "gpt-image-2"
 
@@ -102,10 +115,121 @@ def save_image(image_b64: str, output: Path) -> None:
     output.write_bytes(base64.b64decode(image_b64))
 
 
+def resolve_style(style_name: str | None = None, style_id: str | None = None) -> dict | None:
+    """Resolve a style by name or ID, returning the style dict or None."""
+    if not style_name and not style_id:
+        return None
+
+    styles = load_styles()
+    if style_id:
+        for s in styles:
+            if s.get("id", "") == style_id:
+                return s
+    if style_name:
+        # Search by name (supports Chinese and English)
+        name_lower = style_name.lower()
+        for s in styles:
+            if name_lower in s.get("name_cn", "").lower() or name_lower in s.get("name_en", "").lower():
+                return s
+        # Fuzzy match via the unified Phase 2 search backend.
+        matches = search_styles(style_name, limit=1)
+        if matches:
+            return matches[0]
+    return None
+
+
+def parse_vars(values: list[str] | None) -> dict[str, str]:
+    """Parse repeated key=value CLI arguments."""
+    parsed: dict[str, str] = {}
+    for value in values or []:
+        if "=" not in value:
+            raise SystemExit(f"Invalid --var value '{value}'. Use key=value.")
+        key, raw = value.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise SystemExit(f"Invalid --var value '{value}'. Variable name is empty.")
+        parsed[key] = raw.strip()
+    return parsed
+
+
+def resolve_template(template: str | None) -> dict | None:
+    """Resolve a prompt template by ID/name/query using search.py."""
+    if not template:
+        return None
+    matches = search_prompts(template, limit=10)
+    template_lower = template.lower()
+    for match in matches:
+        if template_lower in {match.get("id", "").lower(), match.get("name", "").lower()}:
+            return match
+    return matches[0] if matches else None
+
+
+def render_template(template: dict, prompt: str, variables: dict[str, str]) -> str:
+    """Render a prompt template, using the prompt as the default subject-like value."""
+    rendered = template.get("template", "")
+    if not rendered:
+        return prompt
+
+    variable_names = [name.strip() for name in template.get("variables", "").split(",") if name.strip()]
+    for name in variable_names:
+        value = variables.get(name)
+        if value is None and name in {"subject", "product", "location", "city", "items"}:
+            value = prompt
+        if value is not None:
+            rendered = rendered.replace("{" + name + "}", value)
+    return rendered
+
+
+def resolve_color(color: str | None) -> dict | None:
+    """Resolve a color palette query using search.py."""
+    if not color:
+        return None
+    matches = search_colors(color, limit=1)
+    return matches[0] if matches else None
+
+
+def apply_template_and_color(args: argparse.Namespace) -> tuple[str, dict | None, dict | None]:
+    """Build the base prompt from a template and optional color palette."""
+    variables = parse_vars(getattr(args, "var", None))
+    template = resolve_template(getattr(args, "template", None))
+    color = resolve_color(getattr(args, "color", None))
+
+    prompt = args.prompt
+    if template:
+        prompt = render_template(template, prompt, variables)
+    if color and color.get("prompt_description"):
+        prompt = f"{prompt}, {color['prompt_description']}"
+
+    return prompt, template, color
+
+
+def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | None]:
+    """Enhance the prompt and return (final_prompt, negative_prompt, style_dict)."""
+    style = resolve_style(style_name=args.style_name, style_id=args.style_id)
+    prompt, _, _ = apply_template_and_color(args)
+
+    result = enhance(
+        prompt=prompt,
+        style_id=args.style_id,
+        style_dict=style,
+        include_negative=args.negative,
+        inject_quality_terms=not args.no_quality,
+    )
+
+    return result["enhanced_prompt"], result["negative_prompt"] if args.negative else None, style
+
+
 def generate(args: argparse.Namespace) -> None:
     config = load_config()
     model = args.model or config["model"]
-    payload = {"model": model, "prompt": args.prompt}
+
+    enhanced_prompt, negative_prompt, style = prepare_prompt(args)
+    _, template, color = apply_template_and_color(args)
+
+    payload: dict = {"model": model, "prompt": enhanced_prompt}
+    if negative_prompt:
+        payload["negative_prompt"] = negative_prompt
+
     response = post_json(
         f"{config['base_url']}/v1/images/generations",
         payload,
@@ -113,24 +237,47 @@ def generate(args: argparse.Namespace) -> None:
     )
     image_b64, revised_prompt = extract_image_b64(response)
     save_image(image_b64, args.output)
-    print(json.dumps({"output": str(args.output), "model": model, "revised_prompt": revised_prompt}, ensure_ascii=False))
+
+    output_info = {
+        "output": str(args.output),
+        "model": model,
+        "revised_prompt": revised_prompt,
+    }
+    if style:
+        output_info["style_id"] = style.get("id", "")
+        output_info["style_name_cn"] = style.get("name_cn", "")
+    if template:
+        output_info["template_id"] = template.get("id", "")
+    if color:
+        output_info["color_id"] = color.get("id", "")
+    if negative_prompt:
+        output_info["negative_prompt"] = negative_prompt
+
+    print(json.dumps(output_info, ensure_ascii=False))
 
 
 def transform(args: argparse.Namespace) -> None:
     config = load_config()
     model = args.model or config["model"]
-    payload = {
+
+    enhanced_prompt, negative_prompt, style = prepare_prompt(args)
+    _, template, color = apply_template_and_color(args)
+
+    payload: dict = {
         "model": model,
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": args.prompt},
+                    {"type": "text", "text": enhanced_prompt},
                     {"type": "image_url", "image_url": {"url": image_data_url(args.input)}},
                 ],
             }
         ],
     }
+    if negative_prompt:
+        payload["negative_prompt"] = negative_prompt
+
     response = post_json(
         f"{config['base_url']}/v1/chat/completions",
         payload,
@@ -138,25 +285,105 @@ def transform(args: argparse.Namespace) -> None:
     )
     image_b64, revised_prompt = extract_image_b64(response)
     save_image(image_b64, args.output)
-    print(json.dumps({"output": str(args.output), "model": model, "revised_prompt": revised_prompt}, ensure_ascii=False))
+
+    output_info = {
+        "output": str(args.output),
+        "model": model,
+        "revised_prompt": revised_prompt,
+    }
+    if style:
+        output_info["style_id"] = style.get("id", "")
+        output_info["style_name_cn"] = style.get("name_cn", "")
+    if template:
+        output_info["template_id"] = template.get("id", "")
+    if color:
+        output_info["color_id"] = color.get("id", "")
+    if negative_prompt:
+        output_info["negative_prompt"] = negative_prompt
+
+    print(json.dumps(output_info, ensure_ascii=False))
+
+
+def suggest(args: argparse.Namespace) -> None:
+    """Print search suggestions without generating an image."""
+    if args.design_system:
+        print(json.dumps(get_design_system(args.prompt, category=args.category), ensure_ascii=False, indent=2))
+        return
+
+    if args.random:
+        output = {}
+        if args.domain in {"style", "all"}:
+            output["styles"] = get_random_styles(args.limit)
+        if args.domain in {"prompt", "all"}:
+            output["prompts"] = get_random_prompts(args.limit)
+        if args.domain in {"color", "all"}:
+            output["colors"] = get_random_colors(args.limit)
+    else:
+        output = {}
+        if args.domain in {"style", "all"}:
+            output["styles"] = search_styles(args.prompt, limit=args.limit, category=args.category)
+        if args.domain in {"prompt", "all"}:
+            output["prompts"] = search_prompts(args.prompt, limit=args.limit, category=args.category)
+        if args.domain in {"color", "all"}:
+            output["colors"] = search_colors(args.prompt, limit=args.limit, category=args.category)
+
+    if args.format == "json":
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        return
+
+    print(f"Suggestions for: {args.prompt}")
+    print(f"(Detected as {'simple' if is_simple_prompt(args.prompt) else 'detailed'} prompt)\n")
+    for style in output.get("styles", []):
+        print(format_style(style))
+    for prompt in output.get("prompts", []):
+        print(format_prompt(prompt))
+    for color in output.get("colors", []):
+        print(format_color(color))
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate or transform images with the Image Craft API.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    generate_parser = subparsers.add_parser("generate", help="Generate an image from text.")
-    generate_parser.add_argument("--prompt", required=True)
-    generate_parser.add_argument("--output", required=True, type=Path)
-    generate_parser.add_argument("--model", default=None)
-    generate_parser.set_defaults(func=generate)
+    # ----- generate -----
+    gen = subparsers.add_parser("generate", help="Generate an image from text.")
+    gen.add_argument("--prompt", required=True)
+    gen.add_argument("--output", required=True, type=Path)
+    gen.add_argument("--model", default=None)
+    gen.add_argument("--style-id", default=None, help="Style ID to apply (e.g. cyberpunk)")
+    gen.add_argument("--style-name", default=None, help="Style name to search and auto-apply")
+    gen.add_argument("--template", default=None, help="Prompt template ID/name/query to render before generation")
+    gen.add_argument("--var", action="append", default=[], help="Template variable in key=value form; repeat as needed")
+    gen.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")
+    gen.add_argument("--negative", action="store_true", help="Include negative prompt")
+    gen.add_argument("--no-quality", action="store_true", help="Skip quality term injection")
+    gen.set_defaults(func=generate)
 
-    transform_parser = subparsers.add_parser("transform", help="Transform an input image with a text instruction.")
-    transform_parser.add_argument("--prompt", required=True)
-    transform_parser.add_argument("--input", required=True, type=Path)
-    transform_parser.add_argument("--output", required=True, type=Path)
-    transform_parser.add_argument("--model", default=None)
-    transform_parser.set_defaults(func=transform)
+    # ----- transform -----
+    trans = subparsers.add_parser("transform", help="Transform an input image with a text instruction.")
+    trans.add_argument("--prompt", required=True)
+    trans.add_argument("--input", required=True, type=Path)
+    trans.add_argument("--output", required=True, type=Path)
+    trans.add_argument("--model", default=None)
+    trans.add_argument("--style-id", default=None)
+    trans.add_argument("--style-name", default=None)
+    trans.add_argument("--template", default=None)
+    trans.add_argument("--var", action="append", default=[])
+    trans.add_argument("--color", default=None)
+    trans.add_argument("--negative", action="store_true")
+    trans.add_argument("--no-quality", action="store_true")
+    trans.set_defaults(func=transform)
+
+    # ----- suggest -----
+    sugg = subparsers.add_parser("suggest", help="Suggest styles for a prompt without generating.")
+    sugg.add_argument("prompt", help="The prompt to get style suggestions for")
+    sugg.add_argument("-n", "--limit", type=int, default=5, help="Max suggestions")
+    sugg.add_argument("--domain", choices=["style", "prompt", "color", "all"], default="style")
+    sugg.add_argument("--category", default=None)
+    sugg.add_argument("--design-system", action="store_true", help="Return style + prompt + color recommendations")
+    sugg.add_argument("--random", action="store_true", help="Return random recommendations")
+    sugg.add_argument("-f", "--format", choices=["text", "json"], default="text")
+    sugg.set_defaults(func=suggest)
 
     return parser
 
