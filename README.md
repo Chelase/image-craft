@@ -96,6 +96,12 @@ pwsh -File scripts/image_craft.ps1 -Command suggest -Prompt "赛博朋克城市"
 
 # Get machine-readable style suggestions
 pwsh -File scripts/image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
+
+# Preview the final enhanced prompt without calling the image API
+pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" -StyleId 3d -Negative -Format json
+
+# Preview with template variables and a color palette
+pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "东京街头" -Template "urban landscape" -Var city=Tokyo,time_of_day=night -Color "midnight blue" -StyleName cyberpunk -Format json
 ```
 
 ### Python
@@ -119,6 +125,9 @@ python scripts/image_craft.py suggest "赛博朋克城市"
 # Search all local libraries as JSON
 python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --format json
 
+# Preview the final enhanced prompt without generating an image
+python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" --style-id 3d --negative --format json
+
 # Generate with a prompt template and color palette
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
@@ -127,7 +136,7 @@ python scripts/image_craft.py generate --prompt "东京街头" --template "urban
 
 The skill includes 54 art styles across 8 categories (traditional, digital, illustration, photography, 3d, special). Styles are auto-enhanced with quality terms and per-style negative prompts.
 
-Use `--style-name` or `--style-id` to apply a style. Use `suggest` command to explore styles, prompt templates, and color palettes from the local `data/*.csv` libraries.
+Use `--style-name` or `--style-id` to apply a style. Category aliases such as `--style-id 3d` resolve to a practical default style (`blender-render`) for professional 3D rendering. Use `suggest` command to explore styles, prompt templates, and color palettes from the local `data/*.csv` libraries.
 
 The unified search backend supports:
 
@@ -138,7 +147,7 @@ The unified search backend supports:
 
 ## Prompt Enhancement
 
-All commands automatically inject quality terms (`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`). Pass `--negative` to include negative prompts that avoid common artifacts (`lowres, bad anatomy, blurry, etc.`). Use `--template`, repeated `--var key=value`, and `--color` to render prompt templates and append color palette descriptions before generation.
+All generation-oriented commands automatically normalize common visual descriptors such as `16:9` into professional composition phrases, inject quality terms (`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`), and apply style templates. Pass `--negative` to include negative prompts that avoid common artifacts (`lowres, bad anatomy, blurry, etc.`). Use `prompt` to preview the final enhanced prompt without calling the image API.
 
 ## Models
 

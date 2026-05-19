@@ -116,6 +116,7 @@ The skill includes 54 art styles across 8 categories. Styles, prompt templates, 
 PowerShell:
 pwsh -File .\scripts\image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output .\outputs\cyberpunk.png
 pwsh -File .\scripts\image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
+pwsh -File .\scripts\image_craft.ps1 -Command prompt -Prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" -StyleId 3d -Negative -Format json
 
 Python:
 python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
@@ -139,13 +140,19 @@ python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --
 python scripts/image_craft.py suggest "赛博朋克未来城市" --design-system
 ```
 
+**Previewing final enhanced prompts (no API call, no image generated):**
+
+```
+python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" --style-id 3d --negative --format json
+```
+
 **Using prompt templates and color palettes:**
 
 ```
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
 
-**Available style categories:** traditional, digital, illustration, photography, 3d, special.
+**Available style categories:** traditional, digital, illustration, photography, 3d, special. Category aliases such as `--style-id 3d` resolve to practical defaults such as `blender-render`.
 
 ## Prompt Enhancement
 
@@ -154,8 +161,9 @@ All `generate` and `transform` commands automatically:
 1. **Quality term injection** — adds `masterpiece, best quality, high resolution, detailed, professional, trending on artstation` unless `--no-quality` is passed.
 2. **Negative prompt** — includes per-style negative terms plus general quality negatives (`lowres, bad anatomy, blurry, etc.`) when `--negative` is passed.
 3. **Style enhancement** — if a style is specified, the style's `prompt_template` field is merged with the user's prompt (replacing any `{subject}` placeholder).
-4. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
-5. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
+4. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
+5. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
+6. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
 
 **Override defaults:**
 
@@ -167,6 +175,7 @@ All `generate` and `transform` commands automatically:
 | `--template` | Render a prompt template from the local template library |
 | `--var key=value` | Fill template variables; repeat as needed |
 | `--color` | Add a searched color palette description |
+| `prompt` | Preview the final enhanced prompt without calling the image API |
 | `suggest --domain style|prompt|color|all` | Search local style/template/color data without generating |
 | `suggest --design-system` | Return combined style + prompt + color recommendations |
 
