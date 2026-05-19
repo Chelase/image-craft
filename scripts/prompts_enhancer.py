@@ -61,6 +61,54 @@ STYLE_KEYWORDS = {
     "special": ["双重曝光", "光绘", "红外", "移轴", "double exposure", "light painting", "infrared", "tilt-shift"],
 }
 
+CATEGORY_DEFAULT_STYLE_IDS = {
+    "3d": "blender-render",
+    "digital": "cyberpunk",
+    "photography": "film-noir",
+    "illustration": "isometric",
+    "traditional": "oil-painting",
+    "effect": "double-exposure",
+    "special": "double-exposure",
+}
+
+
+ASPECT_RATIO_PATTERNS = {
+    "16:9": "16:9 widescreen cinematic aspect ratio",
+    "9:16": "9:16 vertical portrait aspect ratio",
+    "1:1": "1:1 square composition",
+    "4:3": "4:3 classic frame aspect ratio",
+    "3:4": "3:4 vertical frame aspect ratio",
+    "21:9": "21:9 ultra-wide cinematic aspect ratio",
+}
+
+
+SCENE_PHRASE_MAP = [
+    ("3d风格", "3D render style"),
+    ("3D风格", "3D render style"),
+    ("未来科幻城市", "futuristic sci-fi city"),
+    ("科幻城市", "sci-fi city"),
+    ("未来城市", "futuristic city"),
+    ("宏大场景", "epic large-scale scene"),
+    ("飞行汽车", "flying cars"),
+    ("傍晚蓝调时分", "blue hour at dusk"),
+    ("蓝调时分", "blue hour"),
+    ("阴天", "overcast weather"),
+    ("高楼林立", "dense skyline of towering skyscrapers"),
+    ("雾蒙蒙", "hazy atmosphere"),
+    ("灰色天空", "grey sky"),
+    ("一望无际", "boundless urban sprawl stretching to the horizon"),
+    ("半空场景", "mid-air viewpoint"),
+    ("城市高空俯瞰", "high-altitude aerial view over the city"),
+    ("高空俯瞰", "high-altitude aerial view"),
+    ("霓虹灯占比不多", "subtle restrained neon accents"),
+    ("霓虹灯不多", "subtle restrained neon accents"),
+    ("城市灯光", "city lights glowing through the haze"),
+]
+
+
+PUNCTUATION_RE = re.compile(r"[，、；;。]+")
+GENERIC_STYLE_PHRASES = {"3D render style"}
+
 
 def detect_style_category(prompt: str) -> str | None:
     """Detect which style category a prompt mentions."""
@@ -70,6 +118,48 @@ def detect_style_category(prompt: str) -> str | None:
             if kw.lower() in prompt_lower:
                 return category
     return None
+
+
+def normalize_aspect_ratios(prompt: str) -> tuple[str, list[str]]:
+    """Remove raw aspect-ratio tokens and return professional composition phrases."""
+    composition_terms: list[str] = []
+    normalized = prompt
+    for raw, phrase in ASPECT_RATIO_PATTERNS.items():
+        if raw in normalized:
+            composition_terms.append(phrase)
+            normalized = normalized.replace(raw, "")
+    normalized = re.sub(r"\s*,\s*,+", ", ", normalized)
+    normalized = re.sub(r"\s{2,}", " ", normalized).strip(" ,，、")
+    return normalized, composition_terms
+
+
+def normalize_visual_prompt(prompt: str, suppress_generic_style: bool = False) -> str:
+    """Convert common Chinese visual scene descriptors into compact English prompt phrases.
+
+    This is not a general translation layer. It is a deterministic prompt-normalization
+    pass for frequent image-generation descriptors, so style templates receive a clean
+    scene phrase instead of awkward mixed-language fragments.
+    """
+    source, composition_terms = normalize_aspect_ratios(prompt.strip())
+    remaining = source
+    phrases: list[str] = []
+
+    for chinese, english in SCENE_PHRASE_MAP:
+        if chinese in remaining:
+            if not (suppress_generic_style and english in GENERIC_STYLE_PHRASES):
+                phrases.append(english)
+            remaining = remaining.replace(chinese, "")
+
+    leftovers = [part.strip() for part in PUNCTUATION_RE.split(remaining) if part.strip()]
+    for part in leftovers:
+        if part and part not in phrases:
+            phrases.append(part)
+
+    phrases.extend(term for term in composition_terms if term not in phrases)
+    if not phrases:
+        return prompt.strip()
+
+    return ", ".join(phrases)
 
 
 # ----------------------------------------------------------------------
@@ -145,10 +235,12 @@ def apply_style_enhancement(prompt: str, style: dict[str, Any]) -> str:
     """Merge the user's prompt with style enhancement terms."""
     template = style.get("prompt_template", "")
     if not template:
-        return prompt
+        return normalize_visual_prompt(prompt)
 
     # Replace {subject} placeholder with actual prompt
-    subject = prompt.strip().rstrip(",.。")
+    subject = normalize_visual_prompt(prompt, suppress_generic_style=True).strip().rstrip(",.。")
+    if "," in subject:
+        template = template.replace("{subject} in ", "{subject}, in ", 1)
     if subject.lower().startswith(("a ", "an ")):
         template = template.replace("A {subject}", "{subject}", 1)
         template = template.replace("An {subject}", "{subject}", 1)
@@ -180,7 +272,7 @@ def generate_negative_prompt(style: dict[str, Any] | None = None) -> str:
     if style:
         style_neg = style.get("negative_prompt", "").strip()
         if style_neg:
-            parts.append(style_neg)
+            parts.extend(term.strip() for term in style_neg.split(",") if term.strip())
     return ", ".join(parts)
 
 
@@ -194,8 +286,11 @@ def enhance(
     style_dict: dict[str, Any] | None = None,
     include_negative: bool = False,
     inject_quality_terms: bool = True,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Fully enhance a user prompt.
+
+    If both style_dict and style_id are provided, style_dict wins. style_id is
+    resolved only when style_dict is None.
 
     Returns a dict with keys:
       - original_prompt
@@ -214,11 +309,14 @@ def enhance(
         detected_style_id = style.get("id", "")
         style_name_cn = style.get("name_cn", "")
     elif style_id:
+        normalized_style_id = style_id.lower().strip()
+        default_style_id = CATEGORY_DEFAULT_STYLE_IDS.get(normalized_style_id)
+        target_style_id = default_style_id or normalized_style_id
         styles = load_styles()
         for s in styles:
-            if s.get("id", "") == style_id:
+            if s.get("id", "") == target_style_id:
                 style = s
-                detected_style_id = style_id
+                detected_style_id = s.get("id", "")
                 style_name_cn = s.get("name_cn", "")
                 break
 
