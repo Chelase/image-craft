@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("generate", "transform", "suggest")]
+    [ValidateSet("generate", "transform", "suggest", "prompt")]
     [string]$Command,
 
     [Parameter(Mandatory = $true)]
@@ -18,6 +18,14 @@ param(
 
     [string]$StyleName,
 
+    [string]$StyleId,
+
+    [string]$Template,
+
+    [string[]]$Var,
+
+    [string]$Color,
+
     [int]$Limit = 5,
 
     [ValidateSet("style", "prompt", "color", "all")]
@@ -30,7 +38,11 @@ param(
 
     [switch]$DesignSystem,
 
-    [switch]$Random
+    [switch]$Random,
+
+    [switch]$Negative,
+
+    [switch]$NoQuality
 )
 
 $ErrorActionPreference = "Stop"
@@ -306,6 +318,58 @@ function Invoke-SearchScript {
     & $python @arguments
 }
 
+function Invoke-PromptPreviewScript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InputPrompt,
+
+        [string]$InputStyleName,
+
+        [string]$InputStyleId,
+
+        [string]$InputTemplate,
+
+        [string[]]$InputVar,
+
+        [string]$InputColor,
+
+        [string]$OutputFormat = "text"
+    )
+
+    $scriptPath = Join-Path $PSScriptRoot "image_craft.py"
+    $python = Get-PythonCommand
+    $arguments = @($scriptPath, "prompt", "--prompt", $InputPrompt, "--format", $OutputFormat)
+    if (-not [string]::IsNullOrWhiteSpace($InputStyleName)) {
+        $arguments += @("--style-name", $InputStyleName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputStyleId)) {
+        $arguments += @("--style-id", $InputStyleId)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputTemplate)) {
+        $arguments += @("--template", $InputTemplate)
+    }
+    foreach ($variable in @($InputVar)) {
+        if (-not [string]::IsNullOrWhiteSpace($variable)) {
+            $expandedVariables = $variable -split ",(?=[^,=]+=)"
+            foreach ($expandedVariable in $expandedVariables) {
+                if (-not [string]::IsNullOrWhiteSpace($expandedVariable)) {
+                    $arguments += @("--var", $expandedVariable.Trim())
+                }
+            }
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputColor)) {
+        $arguments += @("--color", $InputColor)
+    }
+    if ($Negative) {
+        $arguments += "--negative"
+    }
+    if ($NoQuality) {
+        $arguments += "--no-quality"
+    }
+    & $python @arguments
+}
+
 function Get-StylePrompt {
     param(
         [string]$Subject,
@@ -357,17 +421,28 @@ if ($Command -eq "suggest") {
     return
 }
 
+if ($Command -eq "prompt") {
+    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat $Format
+    return
+}
+
 if ([string]::IsNullOrWhiteSpace($Output)) {
     throw "-Output is required for generate and transform."
 }
 
 $config = Get-ImageCraftConfig
-$finalPrompt = Get-StylePrompt -Subject $Prompt -Name $StyleName
+$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat "json"
+$promptPreview = $promptPreviewJson | ConvertFrom-Json
+$finalPrompt = $promptPreview.enhanced_prompt
+$negativePrompt = $promptPreview.negative_prompt
 
 if ($Command -eq "generate") {
     $payload = @{
         model = $config.Model
         prompt = $finalPrompt
+    }
+    if (-not [string]::IsNullOrWhiteSpace($negativePrompt)) {
+        $payload.negative_prompt = $negativePrompt
     }
     $response = Invoke-RightCodesJson -Url "$($config.BaseUrl)/v1/images/generations" -Payload $payload -ApiKey $config.ApiKey
 }
@@ -395,6 +470,9 @@ else {
             }
         )
     }
+    if (-not [string]::IsNullOrWhiteSpace($negativePrompt)) {
+        $payload.negative_prompt = $negativePrompt
+    }
     $response = Invoke-RightCodesJson -Url "$($config.BaseUrl)/v1/chat/completions" -Payload $payload -ApiKey $config.ApiKey
 }
 
@@ -413,4 +491,6 @@ else {
     output = $savedPath
     image_url = $imageResult.ImageUrl
     revised_prompt = $imageResult.RevisedPrompt
+    prompt = $finalPrompt
+    negative_prompt = $negativePrompt
 } | ConvertTo-Json -Depth 5
