@@ -12,6 +12,9 @@ from typing import Any
 from search import search_styles
 
 
+StyleWeight = tuple[dict[str, Any], float]
+
+
 # Quality keywords injected to improve model output
 QUALITY_TERMS = [
     "masterpiece", "best quality", "high resolution", "detailed",
@@ -221,6 +224,21 @@ def build_style_enhancement(style: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
+def normalize_style_weights(styles: list[StyleWeight]) -> list[StyleWeight]:
+    """Return positive style weights normalized to percentages, highest first."""
+    weighted = [(style, weight) for style, weight in styles if weight > 0]
+    if not weighted:
+        return []
+
+    total = sum(weight for _, weight in weighted)
+    if total <= 0:
+        equal = 1.0 / len(weighted)
+        return [(style, equal) for style, _ in weighted]
+
+    normalized = [(style, weight / total) for style, weight in weighted]
+    return sorted(normalized, key=lambda item: item[1], reverse=True)
+
+
 def suggest_styles_for_prompt(prompt: str, limit: int = 3) -> list[dict[str, Any]]:
     """Suggest styles via the unified Phase 2 search backend."""
     category = detect_style_category(prompt)
@@ -248,6 +266,34 @@ def apply_style_enhancement(prompt: str, style: dict[str, Any]) -> str:
     return enhanced
 
 
+def format_style_mix_description(weighted_styles: list[StyleWeight]) -> str:
+    """Build a compact description of the blended style influences."""
+    parts: list[str] = []
+    for style, weight in weighted_styles:
+        percent = round(weight * 100)
+        name = style.get("name_en") or style.get("id", "style")
+        keywords = style.get("keywords", "").strip()
+        if keywords:
+            parts.append(f"{percent}% {name} influence ({keywords})")
+        else:
+            parts.append(f"{percent}% {name} influence")
+    return ", ".join(parts)
+
+
+def apply_style_mix_enhancement(prompt: str, styles: list[StyleWeight]) -> str:
+    """Merge the user's prompt with multiple weighted style influences."""
+    weighted_styles = normalize_style_weights(styles)
+    if not weighted_styles:
+        return normalize_visual_prompt(prompt)
+
+    primary_style = weighted_styles[0][0]
+    enhanced = apply_style_enhancement(prompt, primary_style)
+    mix_description = format_style_mix_description(weighted_styles)
+    if mix_description:
+        enhanced = f"{enhanced}, blended style mix: {mix_description}"
+    return enhanced
+
+
 # ----------------------------------------------------------------------
 # Quality injection
 # ----------------------------------------------------------------------
@@ -262,18 +308,41 @@ def inject_quality(prompt: str) -> str:
     return f"{prompt.strip()}, {QUALITY_POSITIVE}"
 
 
-def generate_negative_prompt(style: dict[str, Any] | None = None) -> str:
+def unique_terms(terms: list[str]) -> list[str]:
+    """Return terms with stable de-duplication, case-insensitive."""
+    seen: set[str] = set()
+    unique: list[str] = []
+    for term in terms:
+        clean = term.strip()
+        if not clean:
+            continue
+        key = clean.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(clean)
+    return unique
+
+
+def generate_negative_prompt(
+    style: dict[str, Any] | None = None,
+    styles: list[StyleWeight] | None = None,
+) -> str:
     """Generate a negative prompt.
 
     Always include general quality negatives.
     If a style is provided, also append the style's negative_prompt column.
     """
-    parts = [QUALITY_NEGATIVE_STR]
+    parts = list(QUALITY_NEGATIVE)
     if style:
         style_neg = style.get("negative_prompt", "").strip()
         if style_neg:
             parts.extend(term.strip() for term in style_neg.split(",") if term.strip())
-    return ", ".join(parts)
+    for style_dict, _ in normalize_style_weights(styles or []):
+        style_neg = style_dict.get("negative_prompt", "").strip()
+        if style_neg:
+            parts.extend(term.strip() for term in style_neg.split(",") if term.strip())
+    return ", ".join(unique_terms(parts))
 
 
 # ----------------------------------------------------------------------
@@ -284,6 +353,7 @@ def enhance(
     prompt: str,
     style_id: str | None = None,
     style_dict: dict[str, Any] | None = None,
+    style_dicts: list[StyleWeight] | None = None,
     include_negative: bool = False,
     inject_quality_terms: bool = True,
 ) -> dict[str, Any]:
@@ -301,10 +371,14 @@ def enhance(
     """
     # Determine style
     style: dict[str, Any] | None = None
+    weighted_styles = normalize_style_weights(style_dicts or [])
     style_name_cn = ""
     detected_style_id = ""
 
-    if style_dict is not None:
+    if weighted_styles:
+        detected_style_id = ",".join(style.get("id", "") for style, _ in weighted_styles)
+        style_name_cn = ",".join(style.get("name_cn", "") for style, _ in weighted_styles)
+    elif style_dict is not None:
         style = style_dict
         detected_style_id = style.get("id", "")
         style_name_cn = style.get("name_cn", "")
@@ -322,7 +396,9 @@ def enhance(
 
     # Apply style enhancement
     enhanced = prompt
-    if style:
+    if weighted_styles:
+        enhanced = apply_style_mix_enhancement(prompt, weighted_styles)
+    elif style:
         enhanced = apply_style_enhancement(prompt, style)
 
     # Inject quality terms
@@ -330,7 +406,7 @@ def enhance(
         enhanced = inject_quality(enhanced)
 
     # Negative prompt
-    negative = generate_negative_prompt(style) if include_negative else ""
+    negative = generate_negative_prompt(style, weighted_styles) if include_negative else ""
 
     return {
         "original_prompt": prompt,
@@ -338,6 +414,15 @@ def enhance(
         "negative_prompt": negative,
         "style_id": detected_style_id,
         "style_name_cn": style_name_cn,
+        "style_mix": [
+            {
+                "style_id": style.get("id", ""),
+                "style_name_cn": style.get("name_cn", ""),
+                "style_name_en": style.get("name_en", ""),
+                "weight": weight,
+            }
+            for style, weight in weighted_styles
+        ],
         "is_simple": is_simple_prompt(prompt),
     }
 

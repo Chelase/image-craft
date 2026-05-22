@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from prompts_enhancer import enhance, is_simple_prompt, load_styles
+from prompts_enhancer import StyleWeight, enhance, is_simple_prompt, load_styles
 from search import (
     format_color,
     format_prompt,
@@ -159,6 +159,45 @@ def resolve_style(style_name: str | None = None, style_id: str | None = None) ->
     return None
 
 
+def parse_style_mix(value: str | None) -> list[tuple[str, float]]:
+    """Parse style mix values like 'cyberpunk:0.7,blender-render:0.3'."""
+    if not value:
+        return []
+
+    parsed: list[tuple[str, float]] = []
+    for raw_part in re.split(r"[,+]", value):
+        part = raw_part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            style_ref, raw_weight = part.rsplit(":", 1)
+            style_ref = style_ref.strip()
+            try:
+                weight = float(raw_weight.strip())
+            except ValueError as exc:
+                raise SystemExit(f"Invalid --style-mix weight in '{part}'. Use style:weight.") from exc
+        else:
+            style_ref = part
+            weight = 1.0
+        if not style_ref:
+            raise SystemExit(f"Invalid --style-mix value '{part}'. Style name is empty.")
+        if weight <= 0:
+            raise SystemExit(f"Invalid --style-mix weight in '{part}'. Weight must be positive.")
+        parsed.append((style_ref, weight))
+    return parsed
+
+
+def resolve_style_mix(style_mix: str | None) -> list[StyleWeight]:
+    """Resolve a comma/plus separated weighted style mix into style dicts."""
+    styles: list[StyleWeight] = []
+    for style_ref, weight in parse_style_mix(style_mix):
+        style = resolve_style(style_id=style_ref) or resolve_style(style_name=style_ref)
+        if not style:
+            raise SystemExit(f"Could not resolve style in --style-mix: {style_ref}")
+        styles.append((style, weight))
+    return styles
+
+
 def parse_vars(values: list[str] | None) -> dict[str, str]:
     """Parse repeated key=value CLI arguments."""
     parsed: dict[str, str] = {}
@@ -228,8 +267,9 @@ def apply_template_and_color(args: argparse.Namespace) -> tuple[str, dict | None
     return prompt, template, color
 
 
-def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | None]:
-    """Enhance the prompt and return (final_prompt, negative_prompt, style_dict)."""
+def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | None, list[StyleWeight]]:
+    """Enhance the prompt and return (final_prompt, negative_prompt, style_dict, style_mix)."""
+    style_mix = resolve_style_mix(getattr(args, "style_mix", None))
     style = resolve_style(style_name=args.style_name, style_id=args.style_id)
     prompt, _, _ = apply_template_and_color(args)
 
@@ -237,18 +277,19 @@ def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | No
         prompt=prompt,
         style_id=args.style_id,
         style_dict=style,
+        style_dicts=style_mix,
         include_negative=args.negative,
         inject_quality_terms=not args.no_quality,
     )
 
-    return result["enhanced_prompt"], result["negative_prompt"] if args.negative else None, style
+    return result["enhanced_prompt"], result["negative_prompt"] if args.negative else None, style, style_mix
 
 
 def generate(args: argparse.Namespace) -> None:
     config = load_config()
     model = args.model or config["model"]
 
-    enhanced_prompt, negative_prompt, style = prepare_prompt(args)
+    enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     _, template, color = apply_template_and_color(args)
 
     payload: dict = {"model": model, "prompt": enhanced_prompt}
@@ -268,7 +309,17 @@ def generate(args: argparse.Namespace) -> None:
         "model": model,
         "revised_prompt": revised_prompt,
     }
-    if style:
+    if style_mix:
+        output_info["style_mix"] = [
+            {
+                "style_id": item_style.get("id", ""),
+                "style_name_cn": item_style.get("name_cn", ""),
+                "style_name_en": item_style.get("name_en", ""),
+                "weight": item_weight,
+            }
+            for item_style, item_weight in style_mix
+        ]
+    elif style:
         output_info["style_id"] = style.get("id", "")
         output_info["style_name_cn"] = style.get("name_cn", "")
     if template:
@@ -285,7 +336,7 @@ def transform(args: argparse.Namespace) -> None:
     config = load_config()
     model = args.model or config["model"]
 
-    enhanced_prompt, negative_prompt, style = prepare_prompt(args)
+    enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     _, template, color = apply_template_and_color(args)
 
     payload: dict = {
@@ -316,7 +367,17 @@ def transform(args: argparse.Namespace) -> None:
         "model": model,
         "revised_prompt": revised_prompt,
     }
-    if style:
+    if style_mix:
+        output_info["style_mix"] = [
+            {
+                "style_id": item_style.get("id", ""),
+                "style_name_cn": item_style.get("name_cn", ""),
+                "style_name_en": item_style.get("name_en", ""),
+                "weight": item_weight,
+            }
+            for item_style, item_weight in style_mix
+        ]
+    elif style:
         output_info["style_id"] = style.get("id", "")
         output_info["style_name_cn"] = style.get("name_cn", "")
     if template:
@@ -368,7 +429,7 @@ def suggest(args: argparse.Namespace) -> None:
 
 def preview_prompt(args: argparse.Namespace) -> None:
     """Print the final prompt payload without calling the image API."""
-    enhanced_prompt, negative_prompt, style = prepare_prompt(args)
+    enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     prompt, template, color = apply_template_and_color(args)
     output = {
         "original_prompt": args.prompt,
@@ -376,7 +437,17 @@ def preview_prompt(args: argparse.Namespace) -> None:
         "enhanced_prompt": enhanced_prompt,
         "negative_prompt": negative_prompt or "",
     }
-    if style:
+    if style_mix:
+        output["style_mix"] = [
+            {
+                "style_id": item_style.get("id", ""),
+                "style_name_cn": item_style.get("name_cn", ""),
+                "style_name_en": item_style.get("name_en", ""),
+                "weight": item_weight,
+            }
+            for item_style, item_weight in style_mix
+        ]
+    elif style:
         output["style_id"] = style.get("id", "")
         output["style_name_cn"] = style.get("name_cn", "")
         output["style_name_en"] = style.get("name_en", "")
@@ -399,7 +470,10 @@ def preview_prompt(args: argparse.Namespace) -> None:
     print(f"Final:    {output['enhanced_prompt']}")
     if output["negative_prompt"]:
         print(f"Negative: {output['negative_prompt']}")
-    if style:
+    if style_mix:
+        mix_summary = ", ".join(f"{item_style.get('id', '')}:{item_weight:g}" for item_style, item_weight in style_mix)
+        print(f"StyleMix: {mix_summary}")
+    elif style:
         print(f"Style:    {output.get('style_name_cn', '')} ({output.get('style_id', '')})")
     print("=" * 60)
 
@@ -415,6 +489,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--model", default=None)
     gen.add_argument("--style-id", default=None, help="Style ID to apply (e.g. cyberpunk)")
     gen.add_argument("--style-name", default=None, help="Style name to search and auto-apply")
+    gen.add_argument("--style-mix", default=None, help="Weighted styles, e.g. cyberpunk:0.7,blender-render:0.3")
     gen.add_argument("--template", default=None, help="Prompt template ID/name/query to render before generation")
     gen.add_argument("--var", action="append", default=[], help="Template variable in key=value form; repeat as needed")
     gen.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")
@@ -430,6 +505,7 @@ def build_parser() -> argparse.ArgumentParser:
     trans.add_argument("--model", default=None)
     trans.add_argument("--style-id", default=None)
     trans.add_argument("--style-name", default=None)
+    trans.add_argument("--style-mix", default=None)
     trans.add_argument("--template", default=None)
     trans.add_argument("--var", action="append", default=[])
     trans.add_argument("--color", default=None)
@@ -453,6 +529,7 @@ def build_parser() -> argparse.ArgumentParser:
     prev.add_argument("--prompt", required=True)
     prev.add_argument("--style-id", default=None, help="Style ID or category to apply (e.g. blender-render or 3d)")
     prev.add_argument("--style-name", default=None, help="Style name or category to search and auto-apply")
+    prev.add_argument("--style-mix", default=None, help="Weighted styles, e.g. cyberpunk:0.7,blender-render:0.3")
     prev.add_argument("--template", default=None, help="Prompt template ID/name/query to render before preview")
     prev.add_argument("--var", action="append", default=[], help="Template variable in key=value form; repeat as needed")
     prev.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")

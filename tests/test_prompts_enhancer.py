@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from prompts_enhancer import enhance, normalize_visual_prompt  # noqa: E402
-from image_craft import render_template  # noqa: E402
+from image_craft import render_template, resolve_style_mix  # noqa: E402
 
 
 class PromptEnhancerTests(unittest.TestCase):
@@ -52,6 +52,28 @@ class PromptEnhancerTests(unittest.TestCase):
         rendered = render_template(template, "Tokyo street", {"city": "Tokyo", "time_of_day": "night"})
 
         self.assertEqual(rendered, "An urban landscape of Tokyo, night")
+
+    def test_style_mix_merges_weighted_styles_and_negatives(self) -> None:
+        style_mix = resolve_style_mix("cyberpunk:0.7,blender-render:0.3")
+
+        result = enhance(
+            "future city, 16:9",
+            style_dicts=style_mix,
+            include_negative=True,
+        )
+
+        self.assertEqual(result["style_id"], "cyberpunk,blender-render")
+        self.assertIn("cyberpunk style", result["enhanced_prompt"])
+        self.assertIn("blended style mix", result["enhanced_prompt"])
+        self.assertIn("70% Cyberpunk influence", result["enhanced_prompt"])
+        self.assertIn("30% Blender Render influence", result["enhanced_prompt"])
+        self.assertIn("natural", result["negative_prompt"])
+        self.assertIn("cartoon", result["negative_prompt"])
+
+    def test_style_mix_resolves_category_aliases(self) -> None:
+        style_mix = resolve_style_mix("digital:2,3d:1")
+
+        self.assertEqual([style.get("id") for style, _ in style_mix], ["cyberpunk", "blender-render"])
 
 
 if __name__ == "__main__":
