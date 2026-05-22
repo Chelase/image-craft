@@ -117,6 +117,7 @@ PowerShell:
 pwsh -File .\scripts\image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output .\outputs\cyberpunk.png
 pwsh -File .\scripts\image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
 pwsh -File .\scripts\image_craft.ps1 -Command prompt -Prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" -StyleId 3d -Negative -Format json
+pwsh -File .\scripts\image_craft.ps1 -Command prompt -Prompt "未来城市" -StyleMix "cyberpunk:0.7,blender-render:0.3" -Negative -Format json
 
 Python:
 python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
@@ -144,6 +145,9 @@ python scripts/image_craft.py suggest "赛博朋克未来城市" --design-system
 
 ```
 python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" --style-id 3d --negative --format json
+
+# Blend multiple weighted styles in the final prompt preview
+python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
 ```
 
 **Using prompt templates and color palettes:**
@@ -161,9 +165,10 @@ All `generate` and `transform` commands automatically:
 1. **Quality term injection** — adds `masterpiece, best quality, high resolution, detailed, professional, trending on artstation` unless `--no-quality` is passed.
 2. **Negative prompt** — includes per-style negative terms plus general quality negatives (`lowres, bad anatomy, blurry, etc.`) when `--negative` is passed.
 3. **Style enhancement** — if a style is specified, the style's `prompt_template` field is merged with the user's prompt (replacing any `{subject}` placeholder).
-4. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
-5. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
-6. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
+4. **Style mixing** — `--style-mix "cyberpunk:0.7,blender-render:0.3"` uses the highest-weight style as the primary template, adds weighted influence descriptors from all styles, and merges their negative prompts. When `--style-mix` is provided together with `--style-id` or `--style-name`, the style mix takes precedence.
+5. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
+6. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
+7. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
 
 **Override defaults:**
 
@@ -172,6 +177,7 @@ All `generate` and `transform` commands automatically:
 | `--no-quality` | Skip quality term injection |
 | `--negative` | Include negative prompts |
 | `--style-id` or `--style-name` | Apply a style and its enhancement |
+| `--style-mix style:weight,...` | Blend multiple styles with weight control |
 | `--template` | Render a prompt template from the local template library |
 | `--var key=value` | Fill template variables; repeat as needed |
 | `--color` | Add a searched color palette description |

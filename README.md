@@ -102,6 +102,9 @@ pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "3d风格未来科幻
 
 # Preview with template variables and a color palette
 pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "东京街头" -Template "urban landscape" -Var city=Tokyo,time_of_day=night -Color "midnight blue" -StyleName cyberpunk -Format json
+
+# Blend multiple styles with weights
+pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "未来城市" -StyleMix "cyberpunk:0.7,blender-render:0.3" -Negative -Format json
 ```
 
 ### Python
@@ -128,6 +131,9 @@ python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --
 # Preview the final enhanced prompt without generating an image
 python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" --style-id 3d --negative --format json
 
+# Blend multiple styles with weights
+python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
+
 # Generate with a prompt template and color palette
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
@@ -148,6 +154,10 @@ The unified search backend supports:
 ## Prompt Enhancement
 
 All generation-oriented commands automatically normalize common visual descriptors such as `16:9` into professional composition phrases, inject quality terms (`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`), and apply style templates. Pass `--negative` to include negative prompts that avoid common artifacts (`lowres, bad anatomy, blurry, etc.`). Use `prompt` to preview the final enhanced prompt without calling the image API.
+
+Use `--style-mix` to combine multiple weighted styles, for example `cyberpunk:0.7,blender-render:0.3`. The highest-weight style provides the primary template, while all styles contribute weighted influence descriptors and negative prompt terms.
+
+If `--style-mix` is provided together with `--style-id` or `--style-name`, the style mix takes precedence.
 
 ## Models
 

@@ -102,6 +102,9 @@ pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "3d风格未来科幻
 
 # 预览模板变量和配色组合后的提示词
 pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "东京街头" -Template "urban landscape" -Var city=Tokyo,time_of_day=night -Color "midnight blue" -StyleName cyberpunk -Format json
+
+# 按权重混合多个风格
+pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "未来城市" -StyleMix "cyberpunk:0.7,blender-render:0.3" -Negative -Format json
 ```
 
 ### Python
@@ -128,6 +131,9 @@ python scripts/image_craft.py suggest "赛博朋克未来城市" --domain all --
 # 只预览最终增强提示词，不生成图片
 python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" --style-id 3d --negative --format json
 
+# 按权重混合多个风格
+python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
+
 # 使用提示词模板和配色方案生成
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
@@ -148,6 +154,10 @@ python scripts/image_craft.py generate --prompt "东京街头" --template "urban
 ## 提示词增强
 
 生成相关命令会自动把 `16:9` 等常见画幅写法规范化为专业构图短语，并注入质量关键词（`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`）。添加 `--negative` 参数可包含负面提示词，避免常见缺陷（`lowres, bad anatomy, blurry` 等）。使用 `prompt` 命令可以只预览最终增强提示词，不调用图片 API。
+
+使用 `--style-mix` 可以按权重混合多个风格，例如 `cyberpunk:0.7,blender-render:0.3`。权重最高的风格作为主模板，其余风格会作为加权影响描述加入提示词，并合并各自的负面提示词。
+
+如果同时提供 `--style-mix` 和 `--style-id` / `--style-name`，会优先使用风格混合配置。
 
 ## 可用模型
 
