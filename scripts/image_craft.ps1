@@ -20,6 +20,8 @@ param(
 
     [string]$StyleId,
 
+    [string]$StyleMix,
+
     [string]$Template,
 
     [string[]]$Var,
@@ -327,6 +329,8 @@ function Invoke-PromptPreviewScript {
 
         [string]$InputStyleId,
 
+        [string]$InputStyleMix,
+
         [string]$InputTemplate,
 
         [string[]]$InputVar,
@@ -344,6 +348,9 @@ function Invoke-PromptPreviewScript {
     }
     if (-not [string]::IsNullOrWhiteSpace($InputStyleId)) {
         $arguments += @("--style-id", $InputStyleId)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputStyleMix)) {
+        $arguments += @("--style-mix", $InputStyleMix)
     }
     if (-not [string]::IsNullOrWhiteSpace($InputTemplate)) {
         $arguments += @("--template", $InputTemplate)
@@ -422,7 +429,7 @@ if ($Command -eq "suggest") {
 }
 
 if ($Command -eq "prompt") {
-    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat $Format
+    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat $Format
     return
 }
 
@@ -431,7 +438,7 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
 }
 
 $config = Get-ImageCraftConfig
-$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat "json"
+$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat "json"
 $promptPreview = $promptPreviewJson | ConvertFrom-Json
 $finalPrompt = $promptPreview.enhanced_prompt
 $negativePrompt = $promptPreview.negative_prompt
