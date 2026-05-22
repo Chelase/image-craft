@@ -23,3 +23,15 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# skills
+.baoyu-skills
+url-t-markdown
+
+# Generated slide decks and ad-hoc research drafts
+slide-deck/
+GEO.md
+Untitled.md
+
+# Test/tool caches
+.pytest_cache/
