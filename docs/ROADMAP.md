@@ -147,12 +147,12 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 #### 4.2 风格混合器
 - [x] 支持多风格组合
 - [x] 风格权重控制
-- [ ] 风格迁移
+- [x] 风格迁移
 
 #### 4.3 批量生成
-- [ ] 同一提示词多风格变体
-- [ ] 风格探索模式
-- [ ] A/B 测试支持
+- [x] 同一提示词多风格变体
+- [x] 风格探索模式
+- [x] A/B 测试支持
 
 #### 4.4 结构化 Brief 生成器
 
@@ -234,6 +234,33 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 - 本地图片必须先转为公网 URL 才能被目标接口接受
 - 请求失败且错误明显指向 payload shape
 - 用户要求供应商特定高级参数或额外成本操作
+
+#### 4.7 版本与更新检查
+
+> 让 Agent 和用户知道当前技能版本，并在不打断图片生成主流程的前提下提示可用更新。
+
+- [ ] 以 `SKILL.md` frontmatter 中的 `version` 字段作为技能版本单一事实来源
+- [ ] 创建 `docs/CHANGELOG.md`，记录版本号、发布日期、关键变更和升级注意事项
+- [ ] 新增 `scripts/check_update.py`，读取本地版本并查询 GitHub tags / Releases 获取最新版本
+- [ ] 在 `generate` / `transform` 成功完成后触发更新检查；图片生成任务优先，检查失败不影响主任务退出码
+- [ ] 只有检测到远端存在新版本时才提示用户；无更新时保持安静输出
+- [ ] 对更新检查做低频缓存，例如 24 小时内最多检查一次，避免每次生成图片都访问网络
+- [ ] 默认只提示更新命令，不自动执行 `git pull` 或覆盖本地文件
+- [ ] 支持关闭更新检查：环境变量 `IMAGE_CRAFT_DISABLE_UPDATE_CHECK=1`，并考虑 CLI 参数 `--no-update-check`
+- [ ] PowerShell 端通过 shell out 调用 Python 更新检查脚本，避免双端逻辑漂移
+- [ ] 未来发布 CLI 包时，同步规划 `pyproject.toml` / PyPI / `uvx` / `uv tool install`；npm / `npx` 仅作为跨 Node 生态分发选项
+
+**提示原则：**
+- 成功生成或编辑图片后再检查更新
+- 无新版本不提示，避免干扰用户
+- 网络错误、GitHub API 限流或版本解析失败时不报错退出
+- 提示中不打印 API key、本地配置内容或用户 prompt 全文
+
+**提示示例：**
+```text
+Image Craft update available: 1.0.0 -> 1.1.0
+Run: git -C ~/.agents/skills/image-craft pull
+```
 
 ---
 
@@ -342,6 +369,7 @@ image-craft/
 │   ├── image_craft.py              # 主脚本
 │   ├── image_craft.ps1             # PowerShell 脚本
 │   ├── payload_builder.py          # Agent 可读请求体 profile 构造器
+│   ├── check_update.py             # 版本检查与更新提示脚本
 │   └── search.py                   # 搜索引擎
 ├── docs/                           # 项目开发与计划文档
 │   ├── ROADMAP.md                  # 开发计划（本文件）
