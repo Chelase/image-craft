@@ -6,8 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from prompts_enhancer import enhance, normalize_visual_prompt, style_migration_instruction  # noqa: E402
-from image_craft import build_batch_plan, build_parser, prepare_prompt, render_template, resolve_style_mix  # noqa: E402
+from prompts_enhancer import enhance, load_scene_negatives, normalize_visual_prompt, style_migration_instruction  # noqa: E402
+from image_craft import build_batch_plan, build_brief, brief_to_prompt, build_parser, load_brief_templates, resolve_brief_template, apply_brief_template, prepare_prompt, render_template, resolve_style_mix  # noqa: E402
 
 
 class PromptEnhancerTests(unittest.TestCase):
@@ -149,6 +149,116 @@ class PromptEnhancerTests(unittest.TestCase):
 
         self.assertEqual(len(plan["variants"]), 2)
         self.assertEqual(plan["mode"], "explore")
+
+
+    def test_brief_builds_with_chinese_fields(self) -> None:
+        fields = [
+            ("主题", "一杯桂花乌龙茶放在石桌上"),
+            ("场景", "中式庭院，秋天午后"),
+        ]
+        brief = build_brief(fields, brief_type="product-photography")
+
+        self.assertEqual(brief["brief_type"], "product-photography")
+        self.assertEqual(brief["fields"]["主题"], "一杯桂花乌龙茶放在石桌上")
+        self.assertEqual(brief["fields"]["场景"], "中式庭院，秋天午后")
+
+    def test_brief_to_prompt_generates_enhanced_text(self) -> None:
+        fields = [
+            ("主题", "a cup of osmanthus oolong tea"),
+            ("场景", "中式庭院，秋天午后"),
+            ("光影", "侧逆光，金色暖光"),
+        ]
+        brief = build_brief(fields, brief_type="auto")
+        prompt = brief_to_prompt(brief)
+
+        self.assertIn("a cup of osmanthus oolong tea", prompt)
+        self.assertIn("masterpiece", prompt)
+
+    def test_brief_to_prompt_with_style_applies_enhancement(self) -> None:
+        fields = [("主题", "cyberpunk city")]
+        brief = build_brief(fields)
+        prompt = brief_to_prompt(brief, style_id="cyberpunk", include_negative=True)
+
+        self.assertIn("cyberpunk style", prompt)
+        self.assertIn("masterpiece", prompt)
+
+    def test_brief_output_json_is_well_formed(self) -> None:
+        fields = [("主题", "portrait")]
+        brief = build_brief(fields, brief_type="auto")
+        import json
+        dumped = json.dumps(brief, ensure_ascii=False)
+        parsed = json.loads(dumped)
+
+        self.assertEqual(parsed["fields"]["主题"], "portrait")
+
+    def test_load_brief_templates_returns_list(self) -> None:
+        templates = load_brief_templates()
+        self.assertGreaterEqual(len(templates), 3)
+        self.assertIn("product-photography", {t.get("id", "") for t in templates})
+
+    def test_resolve_brief_template_by_id(self) -> None:
+        template = resolve_brief_template("product-photography")
+        self.assertIsNotNone(template)
+        self.assertEqual(template.get("id"), "product-photography")
+        self.assertIn("主题", template.get("fields", ""))
+
+    def test_resolve_brief_template_by_chinese_name(self) -> None:
+        template = resolve_brief_template("产品摄影")
+        self.assertIsNotNone(template)
+        self.assertEqual(template.get("id"), "product-photography")
+
+    def test_apply_brief_template_fills_defaults_and_prompt(self) -> None:
+        template = resolve_brief_template("product-photography")
+        self.assertIsNotNone(template)
+        user_fields = [("主题", "一杯桂花乌龙茶"), ("背景", "大理石桌面")]
+        brief = apply_brief_template(template, user_fields)
+
+        self.assertEqual(brief["fields"]["主题"], "一杯桂花乌龙茶")
+        self.assertIn("16:9", brief["prompt"])
+        self.assertIn("大理石桌面", brief["prompt"])
+
+    def test_apply_brief_template_missing_required_raises(self) -> None:
+        template = resolve_brief_template("product-photography")
+        self.assertIsNotNone(template)
+        with self.assertRaises(SystemExit):
+            apply_brief_template(template, [("主题", "just a topic")])
+
+    def test_scene_negatives_loads_from_csv(self) -> None:
+        terms = load_scene_negatives("product-photography")
+        self.assertGreater(len(terms), 0)
+        self.assertTrue(any("dust" in t.lower() for t in terms))
+
+    def test_scene_negatives_unknown_scene_returns_empty(self) -> None:
+        terms = load_scene_negatives("nonexistent-scene")
+        self.assertEqual(terms, [])
+
+    def test_generate_negative_merges_scene_and_ban(self) -> None:
+        from prompts_enhancer import generate_negative_prompt
+        result = generate_negative_prompt(scene_terms="test_scene_term", ban_terms="test_ban_term")
+        self.assertIn("test_scene_term", result)
+        self.assertIn("test_ban_term", result)
+        self.assertIn("lowres", result)
+
+    def test_enhance_accepts_ban_terms_in_negative(self) -> None:
+        result = enhance("test prompt", include_negative=True, ban_terms="custom_ban_item")
+        self.assertIn("custom_ban_item", result["negative_prompt"])
+        self.assertIn("test prompt", result["enhanced_prompt"])
+
+    def test_enhance_accepts_scene_terms_in_negative(self) -> None:
+        result = enhance("test prompt", include_negative=True, scene_terms="scene_item_x")
+        self.assertIn("scene_item_x", result["negative_prompt"])
+
+    def test_prepare_prompt_with_ban_flag(self) -> None:
+        args = build_parser().parse_args([
+            "prompt",
+            "--prompt", "test portrait",
+            "--style-name", "watercolor",
+            "--negative",
+            "--ban", "bad_ban_term,another_term",
+        ])
+        enhanced, negative, _, _ = prepare_prompt(args)
+        self.assertIn("test portrait", enhanced)
+        self.assertIn("bad_ban_term", negative)
 
 
 if __name__ == "__main__":

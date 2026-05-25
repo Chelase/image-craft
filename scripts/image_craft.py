@@ -280,6 +280,11 @@ def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | No
         raise SystemExit("--style-strength requires --style-id or --style-name.")
     prompt, _, _ = apply_template_and_color(args)
 
+    # Build scene negatives from --scene and --brief-type
+    scene = getattr(args, "scene", None) or getattr(args, "brief_type", None)
+    from prompts_enhancer import load_scene_negatives
+    scene_negatives = ",".join(load_scene_negatives(scene))
+
     result = enhance(
         prompt=prompt,
         style_id=args.style_id,
@@ -288,9 +293,272 @@ def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | No
         style_migration_strength=style_strength,
         include_negative=args.negative,
         inject_quality_terms=not args.no_quality,
+        scene_terms=scene_negatives,
+        ban_terms=getattr(args, "ban", "") or "",
     )
 
     return result["enhanced_prompt"], result["negative_prompt"] if args.negative else None, style, style_mix
+
+
+BRIEF_FIELD_ORDER = ["主题", "场景", "光影", "构图", "镜头", "色调", "画面比例", "风格参考", "禁止"]
+BRIEF_TYPES = ["auto", "product-photography", "ui", "video-storyboard"]
+
+
+def build_brief(
+    fields: list[tuple[str, str]],
+    brief_type: str = "auto",
+) -> dict:
+    """Build a structured design brief from Chinese or English field pairs."""
+    if brief_type not in BRIEF_TYPES:
+        brief_type = "auto"
+    ordered: dict[str, str] = {}
+    seen_keys: set[str] = set()
+    eng_to_cn = {
+        "subject": "主题", "scene": "场景", "lighting": "光影",
+        "composition": "构图", "lens": "镜头", "tone": "色调",
+        "aspect": "画面比例", "style": "风格参考", "ban": "禁止",
+    }
+    for key, value in fields:
+        normalized_key = eng_to_cn.get(key.strip().lower(), key.strip())
+        if normalized_key and not seen_keys.intersection({normalized_key}):
+            ordered[normalized_key] = value
+            seen_keys.add(normalized_key)
+    return {
+        "brief_type": brief_type,
+        "fields": ordered,
+    }
+
+
+def _field_text(brief: dict, key: str, default: str = "") -> str:
+    return brief.get("fields", {}).get(key, default)
+
+
+def _prompt_from_brief(brief: dict) -> str:
+    """Build a natural-language prompt from a structured brief's fields."""
+    parts: list[str] = []
+    f = brief.get("fields", {})
+
+    subject = f.get("主题") or f.get("subject", "")
+    if subject:
+        parts.append(subject)
+
+    scene = f.get("场景") or f.get("scene", "")
+    if scene:
+        parts.append(scene)
+
+    lighting = f.get("光影") or f.get("lighting", "")
+    if lighting:
+        parts.append(lighting)
+
+    composition = f.get("构图") or f.get("composition", "")
+    if composition:
+        parts.append(composition)
+
+    lens = f.get("镜头") or f.get("lens", "")
+    if lens:
+        parts.append(lens)
+
+    tone = f.get("色调") or f.get("tone", "")
+    if tone:
+        parts.append(tone)
+
+    aspect = f.get("画面比例") or f.get("aspect", "")
+    if aspect:
+        parts.append(aspect)
+
+    style_ref = f.get("风格参考") or f.get("style", "")
+    if style_ref:
+        parts.append(style_ref)
+
+    return ", ".join(parts)
+
+
+def brief_to_prompt(
+    brief: dict,
+    style_id: str | None = None,
+    style_dict: dict | None = None,
+    include_negative: bool = False,
+    inject_quality: bool = True,
+    ban_terms: str = "",
+) -> str:
+    """Convert a structured brief into an enhanced prompt using the existing pipeline."""
+    from prompts_enhancer import enhance as enh, load_scene_negatives
+
+    raw_prompt = _prompt_from_brief(brief)
+    if not raw_prompt:
+        return ""
+
+    ban = _field_text(brief, "禁止") or _field_text(brief, "ban")
+    # Merge brief's "禁止" field with CLI --ban terms
+    merged_ban = ",".join(filter(None, [ban, ban_terms]))
+    scene = brief.get("brief_type", "")
+    scene_neg = ",".join(load_scene_negatives(scene))
+
+    result = enh(
+        prompt=raw_prompt,
+        style_id=style_id,
+        style_dict=style_dict,
+        include_negative=include_negative,
+        inject_quality_terms=inject_quality,
+        scene_terms=scene_neg,
+        ban_terms=merged_ban or "",
+    )
+
+    return result["enhanced_prompt"]
+
+
+def load_brief_templates() -> list[dict]:
+    """Load brief templates from data/briefs.csv."""
+    filepath = skill_dir() / "data" / "briefs.csv"
+    if not filepath.exists():
+        return []
+    import csv
+    with open(filepath, "r", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def resolve_brief_template(template_ref: str | None) -> dict | None:
+    """Resolve a brief template by id, Chinese name, or partial match."""
+    if not template_ref:
+        return None
+    templates = load_brief_templates()
+    ref_lower = template_ref.strip().lower()
+    for t in templates:
+        if t.get("id", "").lower() == ref_lower:
+            return t
+    for t in templates:
+        name_cn = t.get("name_cn", "")
+        if ref_lower in name_cn.lower():
+            return t
+    for t in templates:
+        if ref_lower in t.get("id", "").lower() or ref_lower in t.get("name_cn", "").lower():
+            return t
+    return None
+
+
+def apply_brief_template(template: dict, user_fields: list[tuple[str, str]]) -> dict:
+    """Merge a brief template with user-provided fields.
+
+    - Start with defaults from the template.
+    - Override with user field values.
+    - Build the prompt using the template's prompt_template.
+    - Check required_fields are present.
+    """
+    # Parse defaults
+    defaults_raw = template.get("defaults", "").strip()
+    default_pairs: list[tuple[str, str]] = []
+    if defaults_raw:
+        for part in defaults_raw.split(","):
+            part = part.strip()
+            if "=" in part:
+                key, value = part.split("=", 1)
+                key = key.strip()
+                if key:
+                    default_pairs.append((key, value.strip()))
+
+    # Parse required fields
+    required_raw = template.get("required_fields", "").strip()
+    required_fields = [f.strip() for f in required_raw.split(",") if f.strip()]
+
+    # Merge: defaults → user fields (user wins)
+    user_dict = {key: value for key, value in user_fields}
+    merged: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for key, value in default_pairs:
+        merged.append((key, value))
+        seen.add(key)
+    for key, value in user_fields:
+        if key not in seen:
+            merged.append((key, value))
+            seen.add(key)
+        else:
+            # Override default
+            merged = [(k, v if k != key else value) for k, v in merged]
+
+    # Check required
+    merged_keys = {k for k, _ in merged}
+    missing = [f for f in required_fields if f not in merged_keys]
+    if missing:
+        raise SystemExit(
+            f"Brief template '{template.get('id', '')}' requires fields: "
+            f"{', '.join(missing)}. "
+            f"Expected fields: {template.get('fields', '')}"
+        )
+
+    # Build the brief
+    brief = build_brief(merged, brief_type=template.get("id", "auto"))
+
+    # Render prompt from template
+    tmpl = template.get("prompt_template", "")
+    if tmpl:
+        rendered = tmpl
+        for key, value in merged:
+            rendered = rendered.replace("{" + key + "}", value)
+        brief["prompt"] = rendered
+
+    return brief
+
+
+def brief(args: argparse.Namespace) -> None:
+    """Generate a structured brief from natural-language field pairs."""
+    fields: list[tuple[str, str]] = []
+    field_args: list[str] = getattr(args, "field", []) or []
+    for fv in field_args:
+        if "=" not in fv:
+            raise SystemExit(f"Invalid --field value '{fv}'. Use key=value.")
+        key, raw = fv.split("=", 1)
+        key = key.strip()
+        if key:
+            fields.append((key, raw.strip()))
+
+    template = resolve_brief_template(getattr(args, "template", None))
+
+    if template:
+        brief = apply_brief_template(template, fields)
+    else:
+        if not fields:
+            raise SystemExit("At least one --field is required. Example: --field '主题=一杯桂花乌龙茶'")
+        brief = build_brief(fields, brief_type=args.brief_type or "auto")
+
+    if getattr(args, "to_prompt", False):
+        style_id = getattr(args, "style_id", None)
+        style_name = getattr(args, "style_name", None)
+        style_dict = None
+        if style_name:
+            suggestions = search_styles(style_name, limit=1)
+            if suggestions:
+                style_dict = suggestions[0]
+                style_id = style_dict.get("id", "")
+        elif style_id:
+            from prompts_enhancer import load_styles
+            styles = load_styles()
+            for s in styles:
+                if s.get("id", "") == style_id.lower().strip():
+                    style_dict = s
+                    break
+
+        prompt_text = brief_to_prompt(
+            brief,
+            style_id=style_id,
+            style_dict=style_dict,
+            include_negative=args.negative,
+            inject_quality=not args.no_quality,
+            ban_terms=getattr(args, "ban", "") or "",
+        )
+        brief["prompt"] = prompt_text
+
+    if args.format == "json":
+        print(json.dumps(brief, ensure_ascii=False, indent=2))
+    elif args.format == "markdown":
+        print(f"# Design Brief ({brief['brief_type']})")
+        print()
+        fields_dict = brief.get("fields", {})
+        for key, value in fields_dict.items():
+            print(f"**{key}**: {value}")
+            print()
+        if "prompt" in brief:
+            print(f"---")
+            print(f"**Enhanced Prompt**: {brief['prompt']}")
 
 
 def split_style_refs(value: str | None) -> list[str]:
@@ -355,11 +623,15 @@ def build_batch_plan(args: argparse.Namespace) -> dict:
 
     for style in styles:
         for variant_index in range(1, args.variants + 1):
+            from prompts_enhancer import load_scene_negatives
+            scene_neg = ",".join(load_scene_negatives(getattr(args, "scene", None)))
             result = enhance(
                 prompt=base_prompt,
                 style_dict=style,
                 include_negative=args.negative,
                 inject_quality_terms=not args.no_quality,
+                scene_terms=scene_neg,
+                ban_terms=getattr(args, "ban", "") or "",
             )
             style_id = style.get("id", "style")
             variants.append({
@@ -637,6 +909,8 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")
     gen.add_argument("--negative", action="store_true", help="Include negative prompt")
     gen.add_argument("--no-quality", action="store_true", help="Skip quality term injection")
+    gen.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
+    gen.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms (e.g. xiaohongshu, portrait)")
     gen.set_defaults(func=generate)
 
     # ----- batch -----
@@ -655,9 +929,25 @@ def build_parser() -> argparse.ArgumentParser:
     batch_parser.add_argument("--color", default=None)
     batch_parser.add_argument("--negative", action="store_true")
     batch_parser.add_argument("--no-quality", action="store_true")
+    batch_parser.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
+    batch_parser.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms")
     batch_parser.add_argument("--dry-run", action="store_true", help="Print the batch plan without calling the image API")
     batch_parser.add_argument("-f", "--format", choices=["text", "json"], default="json")
     batch_parser.set_defaults(func=batch)
+
+    # ----- brief -----
+    brief_parser = subparsers.add_parser("brief", help="Generate a structured design brief from field pairs.")
+    brief_parser.add_argument("--field", action="append", default=[], help="Field in key=value form; repeat as needed (e.g. '主题=一杯桂花乌龙茶放在石桌上')")
+    brief_parser.add_argument("--brief-type", choices=BRIEF_TYPES, default="auto", help="Brief type template")
+    brief_parser.add_argument("--template", default=None, help="Brief template ID or name from data/briefs.csv; fills defaults and shows expected fields")
+    brief_parser.add_argument("--to-prompt", action="store_true", help="Convert the structured brief to an enhanced prompt")
+    brief_parser.add_argument("--style-id", default=None, help="Style ID to apply in brief→prompt conversion")
+    brief_parser.add_argument("--style-name", default=None, help="Style name to apply in brief→prompt conversion")
+    brief_parser.add_argument("--negative", action="store_true", help="Include negative prompt in brief→prompt conversion")
+    brief_parser.add_argument("--no-quality", action="store_true", help="Skip quality term injection in brief→prompt conversion")
+    brief_parser.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt in brief→prompt conversion")
+    brief_parser.add_argument("-f", "--format", choices=["json", "markdown"], default="json")
+    brief_parser.set_defaults(func=brief)
 
     # ----- transform -----
     trans = subparsers.add_parser("transform", help="Transform an input image with a text instruction.")
@@ -674,6 +964,8 @@ def build_parser() -> argparse.ArgumentParser:
     trans.add_argument("--color", default=None)
     trans.add_argument("--negative", action="store_true")
     trans.add_argument("--no-quality", action="store_true")
+    trans.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
+    trans.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms")
     trans.set_defaults(func=transform)
 
     # ----- suggest -----
@@ -699,6 +991,8 @@ def build_parser() -> argparse.ArgumentParser:
     prev.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")
     prev.add_argument("--negative", action="store_true", help="Include negative prompt")
     prev.add_argument("--no-quality", action="store_true", help="Skip quality term injection")
+    prev.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
+    prev.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms")
     prev.add_argument("-f", "--format", choices=["text", "json"], default="text")
     prev.set_defaults(func=preview_prompt)
 

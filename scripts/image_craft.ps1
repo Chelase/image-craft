@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("generate", "transform", "suggest", "prompt", "batch")]
+    [ValidateSet("generate", "transform", "suggest", "prompt", "batch", "brief")]
     [string]$Command,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$Prompt,
 
     [Parameter(Mandatory = $false)]
@@ -56,9 +56,19 @@ param(
 
     [switch]$DryRun,
 
+    [string]$BriefType,
+
+    [switch]$ToPrompt,
+
+    [string[]]$Field,
+
     [switch]$Negative,
 
-    [switch]$NoQuality
+    [switch]$NoQuality,
+
+    [string]$Ban,
+
+    [string]$Scene
 )
 
 $ErrorActionPreference = "Stop"
@@ -351,9 +361,13 @@ function Invoke-PromptPreviewScript {
 
         [string[]]$InputVar,
 
-        [string]$InputColor,
+    [string]$InputColor,
 
-        [string]$OutputFormat = "text"
+    [string]$InputBan,
+
+    [string]$InputScene,
+
+    [string]$OutputFormat = "text"
     )
 
     $scriptPath = Join-Path $PSScriptRoot "image_craft.py"
@@ -392,6 +406,12 @@ function Invoke-PromptPreviewScript {
     }
     if ($NoQuality) {
         $arguments += "--no-quality"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputBan)) {
+        $arguments += @("--ban", $InputBan)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputScene)) {
+        $arguments += @("--scene", $InputScene)
     }
     & $python @arguments
 }
@@ -448,8 +468,55 @@ function Invoke-BatchScript {
     if ($NoQuality) {
         $arguments += "--no-quality"
     }
+    if (-not [string]::IsNullOrWhiteSpace($Ban)) {
+        $arguments += @("--ban", $Ban)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Scene)) {
+        $arguments += @("--scene", $Scene)
+    }
     if ($DryRun) {
         $arguments += "--dry-run"
+    }
+    & $python @arguments
+}
+
+function Invoke-BriefScript {
+    $scriptPath = Join-Path $PSScriptRoot "image_craft.py"
+    $python = Get-PythonCommand
+    $arguments = @($scriptPath, "brief", "--format", $Format)
+    if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
+        $arguments += @("--field", "主题=$Prompt")
+    }
+    foreach ($fv in @($Field)) {
+        if (-not [string]::IsNullOrWhiteSpace($fv)) {
+            $expandedFields = $fv -split ",(?=[^,=]+=)"
+            foreach ($expandedField in $expandedFields) {
+                if (-not [string]::IsNullOrWhiteSpace($expandedField)) {
+                    $arguments += @("--field", $expandedField.Trim())
+                }
+            }
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($BriefType)) {
+        $arguments += @("--brief-type", $BriefType)
+    }
+    if ($ToPrompt) {
+        $arguments += "--to-prompt"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StyleName)) {
+        $arguments += @("--style-name", $StyleName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StyleId)) {
+        $arguments += @("--style-id", $StyleId)
+    }
+    if ($Negative) {
+        $arguments += "--negative"
+    }
+    if ($NoQuality) {
+        $arguments += "--no-quality"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Ban)) {
+        $arguments += @("--ban", $Ban)
     }
     & $python @arguments
 }
@@ -506,7 +573,7 @@ if ($Command -eq "suggest") {
 }
 
 if ($Command -eq "prompt") {
-    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat $Format
+    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -InputBan $Ban -InputScene $Scene -OutputFormat $Format
     return
 }
 
@@ -518,12 +585,17 @@ if ($Command -eq "batch") {
     return
 }
 
+if ($Command -eq "brief") {
+    Invoke-BriefScript
+    return
+}
+
 if ([string]::IsNullOrWhiteSpace($Output)) {
     throw "-Output is required for generate and transform."
 }
 
 $config = Get-ImageCraftConfig
-$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat "json"
+$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -InputBan $Ban -InputScene $Scene -OutputFormat "json"
 $promptPreview = $promptPreviewJson | ConvertFrom-Json
 $finalPrompt = $promptPreview.enhanced_prompt
 $negativePrompt = $promptPreview.negative_prompt
