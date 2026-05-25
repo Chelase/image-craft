@@ -191,6 +191,50 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 - [ ] 支持 brief 中的“禁止”字段自动进入 negative prompt
 - [ ] 增加产品摄影 / UI 界面 / 小红书封面 / 视频分镜等场景负面词预设
 
+#### 4.6 Agent 可读请求体 Profile 与参考图输入
+
+> 不把 API 请求体写死在某个供应商形态上，而是提供 Agent 可读的默认请求体模板、决策规则和可控覆盖机制。
+
+- [ ] 在 `SKILL.md` 新增 Request Body Strategy，明确 Agent 默认如何选择请求体 profile
+- [ ] 定义默认请求体 profiles：`images-generations`、`images-generations-reference`、`chat-completions-vision`、`chat-completions-transform`、`custom`
+- [ ] 新增 `scripts/payload_builder.py`，负责根据 profile 构造请求体并支持 deep merge override
+- [ ] 支持 `--profile` 参数，由 Agent 或用户选择请求体模板
+- [ ] 支持本地参考图 `--image`，自动转 base64 / data URL 后进入默认 profile
+- [ ] 支持远程参考图 `--image-url`，直接作为 URL 进入默认 profile
+- [ ] 支持多参考图输入，并保留用途声明：style / composition / subject / palette
+- [ ] 支持 `--size` 和 `--response-format`，默认适配 Right Codes `/v1/images/generations`
+- [ ] 支持 `--payload-json` 和 `--payload-merge`，允许 Agent 根据供应商文档合并自定义字段
+- [ ] 修复 Python 端 `data[0].url` 响应下载能力，与 PowerShell 端保持一致
+- [ ] 更新 README / README_CN，区分“参考图输入 / 图文输入”和传统 multipart 文件上传
+
+**Agent 默认决策：**
+| 用户意图 | 默认 profile | 说明 |
+|---|---|---|
+| 纯文生图 | `images-generations` | 默认 `/v1/images/generations` |
+| 参考图生成 | `images-generations-reference` | 将本地图转 base64 或使用远程 URL 放入 `image` 字段 |
+| 图片分析 / 图文理解 | `chat-completions-vision` | 使用 `messages[].content[]` 的 `image_url` URL 结构 |
+| 图片转换 / 改图 | `chat-completions-transform` 或供应商文档指定 profile | 文档不明确时由 Agent 告知用户选择 |
+| 供应商特殊字段 | `custom` + `--payload-merge` | Agent 根据 API 文档合并自定义字段 |
+
+**Right Codes 默认请求体示例：**
+```json
+{
+  "model": "{model}",
+  "prompt": "{enhanced_prompt}",
+  "image": "{reference_images}",
+  "size": "{size}",
+  "response_format": "url",
+  "negative_prompt": "{negative_prompt}"
+}
+```
+
+**Agent 询问用户的边界：**
+- API 文档没有说明参考图字段名
+- 同一任务存在多个有效请求体形态
+- 本地图片必须先转为公网 URL 才能被目标接口接受
+- 请求失败且错误明显指向 payload shape
+- 用户要求供应商特定高级参数或额外成本操作
+
 ---
 
 ### Phase 5: GEO 推广优化 ⏳
@@ -280,29 +324,36 @@ image-craft/
 ├── SKILL.md
 ├── README.md
 ├── README_CN.md
-├── ROADMAP.md
-├── CHANGELOG.md                    # 更新日志
+├── CLAUDE.md                       # Agent 桥接入口
 ├── private_config.json.example
 ├── .gitignore
-├── data/                          # 数据库目录
-│   ├── styles.csv                 # 风格数据库
-│   ├── prompts.csv                # 提示词模板库
-│   ├── colors.csv                 # 色彩方案库
-│   ├── briefs.csv                 # 结构化 brief 模板库
-│   ├── negatives.csv              # 场景化负面提示词库
-│   └── tags.csv                   # 标签索引
+├── .agent-rules/                   # 项目级 agent 规则真来源
+│   ├── README.md
+│   ├── skills-workflow.md
+│   └── repo-context.md
+├── data/                           # 数据库目录
+│   ├── styles.csv                  # 风格数据库
+│   ├── prompts.csv                 # 提示词模板库
+│   ├── colors.csv                  # 色彩方案库
+│   ├── briefs.csv                  # 结构化 brief 模板库
+│   ├── negatives.csv               # 场景化负面提示词库
+│   └── tags.csv                    # 标签索引
 ├── scripts/
-│   ├── image_craft.py             # 主脚本
-│   ├── image_craft.ps1            # PowerShell 脚本
-│   └── search.py                  # 搜索引擎
-├── docs/                          # 文档目录（GEO 优化）
-│   ├── getting-started.md         # 快速入门
-│   ├── styles-guide.md            # 风格指南
-│   ├── prompt-engineering.md      # 提示词工程
-│   └── faq.md                     # 常见问题
-└── examples/                      # 示例目录
-    ├── styles/                    # 风格示例图
-    └── prompts/                   # 提示词示例
+│   ├── image_craft.py              # 主脚本
+│   ├── image_craft.ps1             # PowerShell 脚本
+│   ├── payload_builder.py          # Agent 可读请求体 profile 构造器
+│   └── search.py                   # 搜索引擎
+├── docs/                           # 项目开发与计划文档
+│   ├── ROADMAP.md                  # 开发计划（本文件）
+│   ├── GEO.md                      # GEO 执行手册
+│   ├── CHANGELOG.md                # 更新日志
+│   ├── getting-started.md          # 快速入门
+│   ├── styles-guide.md             # 风格指南
+│   ├── prompt-engineering.md       # 提示词工程
+│   └── faq.md                      # 常见问题
+└── examples/                       # 示例目录
+    ├── styles/                     # 风格示例图
+    └── prompts/                    # 提示词示例
 ```
 
 ---
