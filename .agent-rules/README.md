@@ -23,6 +23,7 @@
    - 功能进度真来源：`docs/ROADMAP.md`
    - GEO 工作真来源：`docs/GEO.md`
    - 数据 schema：`data/*.csv` 头行
+   - 技能规范：`.agent-rules/skill-standards.md`
 
 ## 3. 规则优先级
 
@@ -67,6 +68,7 @@
 | 技能能力描述 | `SKILL.md` | `README.md` / `README_CN.md` 摘要 |
 | 风格/模板/配色数据 | `data/*.csv` | — |
 | CLI 参数与示例 | `scripts/image_craft.py` 的 `build_parser` | `README*.md` + `SKILL.md` 示例段 |
+| 技能结构与触发规范 | `.agent-rules/skill-standards.md` | `SKILL.md` |
 
 发现以上之外的文件描述这些内容时，应消除重复或回链真来源。
 
@@ -120,5 +122,6 @@
 
 - `.agent-rules/` 内容变化时，不要扩散到 `CLAUDE.md` / `README*.md` 详细描述
 - 新增技能集或工作流变化时，更新 [`skills-workflow.md`](./skills-workflow.md)
+- 修改技能结构、触发描述或包装方式时，遵守 [`skill-standards.md`](./skill-standards.md)
 - 项目阶段变化时（如完成 Phase 4 或 5），更新本文件 §4
 - 项目背景变化时（如换远端、改许可证），更新 [`repo-context.md`](./repo-context.md)

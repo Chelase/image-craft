@@ -135,6 +135,18 @@ pwsh -File .\scripts\image_craft.ps1 -Command batch -Prompt "未来城市" -Styl
 Python:
 python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
 python scripts/image_craft.py batch --prompt "future city" --styles "cyberpunk,watercolor,blender-render" --output-dir outputs/batch --ab-label A --ab-label B --ab-label C --dry-run --format json
+
+**Generating a structured design brief:**
+```
+# Preview the brief as Markdown
+python scripts/image_craft.py brief --field "主题=一杯桂花乌龙茶放在石桌上" --field "场景=中式庭院，秋天午后" --brief-type product-photography --format markdown
+
+# Use a brief template with auto-filled defaults
+python scripts/image_craft.py brief --template "产品摄影" --field "主题=一杯桂花乌龙茶" --field "背景=大理石桌面" --to-prompt --style-name photography --format json
+
+# Convert to an enhanced prompt with style
+python scripts/image_craft.py brief --field "主题=a cup of osmanthus oolong tea" --field "场景=Chinese garden, autumn afternoon" --to-prompt --style-name "photography" --format json
+```
 ```
 
 **Using a style by ID:**
@@ -187,10 +199,11 @@ All `generate` and `transform` commands automatically:
 3. **Style enhancement** — if a style is specified, the style's `prompt_template` field is merged with the user's prompt (replacing any `{subject}` placeholder).
 4. **Style mixing** — `--style-mix "cyberpunk:0.7,blender-render:0.3"` uses the highest-weight style as the primary template, adds weighted influence descriptors from all styles, and merges their negative prompts. When `--style-mix` is provided together with `--style-id` or `--style-name`, the style mix takes precedence.
 5. **Style migration** — for `transform`, `--style-strength` with `--style-id` or `--style-name` migrates the source image toward the target style while preserving source structure and subject identity.
-6. **Batch style variants** — `batch --styles ...` or `batch --explore` creates multiple enhanced prompts and output paths from one source prompt, with optional A/B labels.
-7. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
-8. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
-9. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
+6. **Structured brief generator** — `brief --field key=value ...` accepts Chinese or English field pairs and outputs a structured design brief. Use `--to-prompt` to convert the brief into an enhanced prompt through the existing style/template/color pipeline.
+7. **Batch style variants** — `batch --styles ...` or `batch --explore` creates multiple enhanced prompts and output paths from one source prompt, with optional A/B labels.
+8. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
+9. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
+10. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
 
 **Override defaults:**
 
@@ -204,6 +217,9 @@ All `generate` and `transform` commands automatically:
 | `batch --styles ...` | Generate or preview multiple explicit style variants |
 | `batch --explore --limit N` | Search recommended styles and build a style exploration batch |
 | `--ab-label LABEL` | Attach A/B labels to batch variants; repeat as needed |
+| `brief --field key=value` | Build a structured design brief from Chinese or English field pairs |
+| `brief --template ID` | Load a brief template from data/briefs.csv with auto-filled defaults and field hints |
+| `brief --to-prompt` | Convert the structured brief into an enhanced prompt |
 | `--template` | Render a prompt template from the local template library |
 | `--var key=value` | Fill template variables; repeat as needed |
 | `--color` | Add a searched color palette description |

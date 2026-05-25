@@ -149,6 +149,12 @@ python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9
 # 按权重混合多个风格
 python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
 
+# 从结构化设计字段生成增强提示词
+python scripts/image_craft.py brief --field "主题=一杯桂花乌龙茶放在石桌上" --field "场景=中式庭院，秋天午后" --field "光影=侧逆光，金色暖光" --field "构图=居中偏下，浅景深，前景落叶虚化" --field "镜头=85mm, f/2.0" --field "色调=低饱和暖色，胶片质感" --field "画面比例=3:4" --field "禁止=人物出现,过度饱和,文字" --brief-type product-photography --format markdown
+
+# 使用 brief 模板库，默认值自动填充
+python scripts/image_craft.py brief --template "产品摄影" --field "主题=一杯桂花乌龙茶" --field "背景=大理石桌面" --to-prompt --style-name photography --format json
+
 # 预览同一提示词的多风格批量生成计划，不调用图片 API
 python scripts/image_craft.py batch --prompt "未来城市" --styles "cyberpunk,watercolor,blender-render" --output-dir outputs/batch --ab-label A --ab-label B --ab-label C --dry-run --format json
 
