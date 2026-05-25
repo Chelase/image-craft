@@ -94,6 +94,9 @@ pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "一只可爱的猫
 # 转换图片
 pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage input.png -Output outputs/watercolor.png
 
+# 按目标风格强度迁移图片风格
+pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "保留人物构图" -InputImage input.png -StyleName "watercolor" -StyleStrength 0.65 -Output outputs/watercolor-migration.png
+
 # 使用风格生成（按名称）
 pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output outputs/cyberpunk.png
 
@@ -111,6 +114,9 @@ pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "东京街头" -Templ
 
 # 按权重混合多个风格
 pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "未来城市" -StyleMix "cyberpunk:0.7,blender-render:0.3" -Negative -Format json
+
+# 预览同一提示词的多风格批量生成计划，不调用图片 API
+pwsh -File scripts/image_craft.ps1 -Command batch -Prompt "未来城市" -Styles "cyberpunk,watercolor,blender-render" -OutputDir outputs/batch -AbLabel A,B,C -DryRun -Format json
 ```
 
 ### Python
@@ -121,6 +127,9 @@ python scripts/image_craft.py generate --prompt "一只可爱的猫咪" --output
 
 # 转换图片
 python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
+
+# 按目标风格强度迁移图片风格
+python scripts/image_craft.py transform --prompt "保留人物构图" --input input.png --style-name "watercolor" --style-strength 0.65 --output outputs/watercolor-migration.png
 
 # 使用风格生成（按名称或ID）
 python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
@@ -140,6 +149,12 @@ python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9
 # 按权重混合多个风格
 python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
 
+# 预览同一提示词的多风格批量生成计划，不调用图片 API
+python scripts/image_craft.py batch --prompt "未来城市" --styles "cyberpunk,watercolor,blender-render" --output-dir outputs/batch --ab-label A --ab-label B --ab-label C --dry-run --format json
+
+# 根据本地搜索推荐风格生成探索计划
+python scripts/image_craft.py batch --prompt "赛博朋克城市" --explore --limit 3 --output-dir outputs/explore --dry-run --format json
+
 # 使用提示词模板和配色方案生成
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
@@ -157,6 +172,8 @@ python scripts/image_craft.py generate --prompt "东京街头" --template "urban
 - `--random` 随机推荐
 - `--format json` 输出机器可读结果
 
+使用 `batch` 可以基于同一个提示词创建多个风格变体。通过 `--styles "cyberpunk,watercolor"` 指定风格，或使用 `--explore --limit 3` 从本地搜索后端自动选择推荐风格。`--dry-run` 会输出 JSON 批量计划，包含增强后的提示词、输出路径和 A/B 标签，但不会调用图片 API。
+
 ## 提示词增强
 
 生成相关命令会自动把 `16:9` 等常见画幅写法规范化为专业构图短语，并注入质量关键词（`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`）。添加 `--negative` 参数可包含负面提示词，避免常见缺陷（`lowres, bad anatomy, blurry` 等）。使用 `prompt` 命令可以只预览最终增强提示词，不调用图片 API。
@@ -164,6 +181,8 @@ python scripts/image_craft.py generate --prompt "东京街头" --template "urban
 使用 `--style-mix` 可以按权重混合多个风格，例如 `cyberpunk:0.7,blender-render:0.3`。权重最高的风格作为主模板，其余风格会作为加权影响描述加入提示词，并合并各自的负面提示词。
 
 如果同时提供 `--style-mix` 和 `--style-id` / `--style-name`，会优先使用风格混合配置。
+
+对于图编辑 / 图生图转换，使用 `--style-strength` 搭配 `--style-id` 或 `--style-name` 可以把输入图迁移到目标风格，同时保留原图结构和主体身份。例如 `--style-name watercolor --style-strength 0.65` 表示 65% 水彩风格迁移，并保留 35% 原图结构。
 
 ## 可用模型
 

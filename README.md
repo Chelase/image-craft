@@ -94,6 +94,9 @@ pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "一只可爱的猫
 # Transform an image
 pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage input.png -Output outputs/watercolor.png
 
+# Migrate an image toward a target style with partial strength
+pwsh -File scripts/image_craft.ps1 -Command transform -Prompt "保留人物构图" -InputImage input.png -StyleName "watercolor" -StyleStrength 0.65 -Output outputs/watercolor-migration.png
+
 # Generate with a style (by name)
 pwsh -File scripts/image_craft.ps1 -Command generate -Prompt "东京街头" -StyleName "赛博朋克" -Output outputs/cyberpunk.png
 
@@ -111,6 +114,9 @@ pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "东京街头" -Templ
 
 # Blend multiple styles with weights
 pwsh -File scripts/image_craft.ps1 -Command prompt -Prompt "未来城市" -StyleMix "cyberpunk:0.7,blender-render:0.3" -Negative -Format json
+
+# Preview a batch plan for multiple style variants without calling the image API
+pwsh -File scripts/image_craft.ps1 -Command batch -Prompt "未来城市" -Styles "cyberpunk,watercolor,blender-render" -OutputDir outputs/batch -AbLabel A,B,C -DryRun -Format json
 ```
 
 ### Python
@@ -121,6 +127,9 @@ python scripts/image_craft.py generate --prompt "一只可爱的猫咪" --output
 
 # Transform an image
 python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
+
+# Migrate an image toward a target style with partial strength
+python scripts/image_craft.py transform --prompt "preserve the portrait composition" --input input.png --style-name "watercolor" --style-strength 0.65 --output outputs/watercolor-migration.png
 
 # Generate with a style (by name or ID)
 python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
@@ -140,6 +149,12 @@ python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9
 # Blend multiple styles with weights
 python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
 
+# Preview a batch plan for multiple style variants without calling the image API
+python scripts/image_craft.py batch --prompt "future city" --styles "cyberpunk,watercolor,blender-render" --output-dir outputs/batch --ab-label A --ab-label B --ab-label C --dry-run --format json
+
+# Explore recommended styles for a prompt and generate a dry-run batch plan
+python scripts/image_craft.py batch --prompt "cyberpunk city" --explore --limit 3 --output-dir outputs/explore --dry-run --format json
+
 # Generate with a prompt template and color palette
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
 ```
@@ -157,6 +172,8 @@ The unified search backend supports:
 - `--random` for random recommendations
 - `--format json` for machine-readable output
 
+Use `batch` to create multiple variants from one prompt. Pass explicit styles with `--styles "cyberpunk,watercolor"`, or use `--explore --limit 3` to select recommended styles from the local search backend. `--dry-run` prints a JSON batch plan with enhanced prompts, output paths, and A/B labels without calling the image API.
+
 ## Prompt Enhancement
 
 All generation-oriented commands automatically normalize common visual descriptors such as `16:9` into professional composition phrases, inject quality terms (`masterpiece, best quality, high resolution, detailed, professional, trending on artstation`), and apply style templates. Pass `--negative` to include negative prompts that avoid common artifacts (`lowres, bad anatomy, blurry, etc.`). Use `prompt` to preview the final enhanced prompt without calling the image API.
@@ -164,6 +181,8 @@ All generation-oriented commands automatically normalize common visual descripto
 Use `--style-mix` to combine multiple weighted styles, for example `cyberpunk:0.7,blender-render:0.3`. The highest-weight style provides the primary template, while all styles contribute weighted influence descriptors and negative prompt terms.
 
 If `--style-mix` is provided together with `--style-id` or `--style-name`, the style mix takes precedence.
+
+For image-to-image transformations, use `--style-strength` with `--style-id` or `--style-name` to migrate the source image toward a target style while preserving source structure and subject identity. For example, `--style-name watercolor --style-strength 0.65` applies a 65% watercolor migration and preserves 35% of the source image structure.
 
 ## Models
 

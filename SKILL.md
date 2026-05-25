@@ -94,11 +94,17 @@ For image-to-image transformation:
 PowerShell:
 ```powershell
 pwsh -File .\scripts\image_craft.ps1 -Command transform -Prompt "改成水彩画风" -InputImage .\input.png -Output .\outputs\watercolor.png
+
+# Migrate an image toward a target style with partial strength
+pwsh -File .\scripts\image_craft.ps1 -Command transform -Prompt "保留人物构图" -InputImage .\input.png -StyleName "watercolor" -StyleStrength 0.65 -Output .\outputs\watercolor-migration.png
 ```
 
 Python:
 ```bash
 python scripts/image_craft.py transform --prompt "改成水彩画风" --input input.png --output outputs/watercolor.png
+
+# Migrate an image toward a target style with partial strength
+python scripts/image_craft.py transform --prompt "preserve the portrait composition" --input input.png --style-name "watercolor" --style-strength 0.65 --output outputs/watercolor-migration.png
 ```
 
 ## Model Selection
@@ -124,9 +130,11 @@ pwsh -File .\scripts\image_craft.ps1 -Command generate -Prompt "东京街头" -S
 pwsh -File .\scripts\image_craft.ps1 -Command suggest -Prompt "cyberpunk" -Limit 1 -Format json
 pwsh -File .\scripts\image_craft.ps1 -Command prompt -Prompt "3d风格未来科幻城市，16:9，城市高空俯瞰" -StyleId 3d -Negative -Format json
 pwsh -File .\scripts\image_craft.ps1 -Command prompt -Prompt "未来城市" -StyleMix "cyberpunk:0.7,blender-render:0.3" -Negative -Format json
+pwsh -File .\scripts\image_craft.ps1 -Command batch -Prompt "未来城市" -Styles "cyberpunk,watercolor,blender-render" -OutputDir .\outputs\batch -AbLabel A,B,C -DryRun -Format json
 
 Python:
 python scripts/image_craft.py generate --prompt "东京街头" --style-name "赛博朋克" --output outputs/cyberpunk.png
+python scripts/image_craft.py batch --prompt "future city" --styles "cyberpunk,watercolor,blender-render" --output-dir outputs/batch --ab-label A --ab-label B --ab-label C --dry-run --format json
 ```
 
 **Using a style by ID:**
@@ -154,6 +162,12 @@ python scripts/image_craft.py prompt --prompt "3d风格未来科幻城市，16:9
 
 # Blend multiple weighted styles in the final prompt preview
 python scripts/image_craft.py prompt --prompt "未来城市" --style-mix "cyberpunk:0.7,blender-render:0.3" --negative --format json
+
+# Preview an image-to-image style migration prompt
+python scripts/image_craft.py prompt --prompt "preserve the portrait composition" --style-name "watercolor" --style-strength 0.65 --format json
+
+# Preview a batch plan for style exploration and A/B comparison
+python scripts/image_craft.py batch --prompt "cyberpunk city" --explore --limit 3 --output-dir outputs/explore --dry-run --format json
 ```
 
 **Using prompt templates and color palettes:**
@@ -172,9 +186,11 @@ All `generate` and `transform` commands automatically:
 2. **Negative prompt** — includes per-style negative terms plus general quality negatives (`lowres, bad anatomy, blurry, etc.`) when `--negative` is passed.
 3. **Style enhancement** — if a style is specified, the style's `prompt_template` field is merged with the user's prompt (replacing any `{subject}` placeholder).
 4. **Style mixing** — `--style-mix "cyberpunk:0.7,blender-render:0.3"` uses the highest-weight style as the primary template, adds weighted influence descriptors from all styles, and merges their negative prompts. When `--style-mix` is provided together with `--style-id` or `--style-name`, the style mix takes precedence.
-5. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
-6. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
-7. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
+5. **Style migration** — for `transform`, `--style-strength` with `--style-id` or `--style-name` migrates the source image toward the target style while preserving source structure and subject identity.
+6. **Batch style variants** — `batch --styles ...` or `batch --explore` creates multiple enhanced prompts and output paths from one source prompt, with optional A/B labels.
+7. **Visual phrase normalization** — common Chinese scene descriptors and aspect ratios such as `16:9` are normalized into compact English image-prompt phrases before style templates are applied.
+8. **Template rendering** — `--template` searches `data/prompts.csv`, renders variables from repeated `--var key=value`, and uses the original prompt for common subject fields.
+9. **Color palette injection** — `--color` searches `data/colors.csv` and appends the palette's prompt description.
 
 **Override defaults:**
 
@@ -184,6 +200,10 @@ All `generate` and `transform` commands automatically:
 | `--negative` | Include negative prompts |
 | `--style-id` or `--style-name` | Apply a style and its enhancement |
 | `--style-mix style:weight,...` | Blend multiple styles with weight control |
+| `--style-strength 0.0..1.0` | Control image-to-image style migration strength for `transform` |
+| `batch --styles ...` | Generate or preview multiple explicit style variants |
+| `batch --explore --limit N` | Search recommended styles and build a style exploration batch |
+| `--ab-label LABEL` | Attach A/B labels to batch variants; repeat as needed |
 | `--template` | Render a prompt template from the local template library |
 | `--var key=value` | Fill template variables; repeat as needed |
 | `--color` | Add a searched color palette description |
