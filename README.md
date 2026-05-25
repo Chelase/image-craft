@@ -2,6 +2,12 @@
 
 > English | [中文](README_CN.md)
 
+> **TL;DR** - Image Craft is a universal AI Agent skill for generating and editing images through OpenAI-compatible APIs such as `gpt-image-2`, Azure-compatible endpoints, and Right Codes. It bundles 54 art styles, 119 prompt templates, and 50 color palettes with local search and prompt enhancement.
+>
+> **Use it when:** You need image generation or image editing from an Agent CLI without writing API payload code.
+> **Install:** `git clone https://github.com/Chelase/image-craft.git ~/.agents/skills/image-craft`
+> **One command:** `python scripts/image_craft.py generate --prompt "cyberpunk Tokyo street" --style-name cyberpunk --output outputs/tokyo.png`
+
 A universal skill for AI agents to generate and edit images using OpenAI-compatible GPT image APIs.
 
 ## Features

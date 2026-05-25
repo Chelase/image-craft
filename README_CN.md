@@ -2,6 +2,12 @@
 
 > [English](README.md) | 中文
 
+> **TL;DR** - Image Craft 是面向 AI Agent 的通用图片生成技能，通过 `gpt-image-2`、Azure 兼容端点、Right Codes 等 OpenAI 兼容 API 支持文生图和图编辑。它内置 54 种艺术风格、119 个提示词模板和 50 套配色，并提供本地搜索和提示词增强。
+>
+> **适用场景：** 需要在 Agent CLI 中生成或编辑图片，但不想手写图片 API 请求体。
+> **安装：** `git clone https://github.com/Chelase/image-craft.git ~/.agents/skills/image-craft`
+> **一条命令：** `python scripts/image_craft.py generate --prompt "cyberpunk Tokyo street" --style-name cyberpunk --output outputs/tokyo.png`
+
 AI Agent 通用图片生成技能 - 支持 OpenAI 兼容 API 的文生图和图编辑
 
 ## 功能特性
