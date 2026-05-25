@@ -158,12 +158,12 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 
 > 借鉴结构化提示词方法，把自然语言需求升级为可复用的设计 brief，再转换为专业生图提示词。
 
-- [ ] 新增 `brief` 命令，支持只生成结构化 brief，不调用图片 API
-- [ ] 支持图片 / 产品摄影 / UI 界面 / 视频分镜等 brief 类型
-- [ ] 支持中文字段输入，如主题、场景、光影、构图、镜头、色调、风格参考、画面比例、禁止项
-- [ ] 支持 brief 输出为 JSON / YAML / Markdown
-- [ ] 支持 brief → prompt 转换，复用现有风格、模板、配色和提示词增强管线
-- [ ] 添加结构化 brief 模板库，支持用户按字段填空
+- [x] 新增 `brief` 命令，支持只生成结构化 brief，不调用图片 API
+- [x] 支持图片 / 产品摄影 / UI 界面 / 视频分镜等 brief 类型（通过 `--brief-type`）
+- [x] 支持中文字段输入，如主题、场景、光影、构图、镜头、色调、风格参考、画面比例、禁止项（通过 `--field key=value`）
+- [x] 支持 brief 输出为 JSON / Markdown
+- [x] 支持 brief → prompt 转换，复用现有风格、模板、配色和提示词增强管线
+- [x] 添加结构化 brief 模板库，支持用户按字段填空（`data/briefs.csv`，含 5 个预设模板：产品摄影、UI 界面、视频分镜、人像摄影、风光摄影）
 
 **Brief 示例：**
 ```yaml
@@ -182,14 +182,14 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 
 #### 4.5 场景化负面提示词
 
-> 将“禁止项”从固定质量负面词升级为按场景、风格、用户意图组合的 negative prompt 系统。
+> 将"禁止项"从固定质量负面词升级为按场景、风格、用户意图组合的 negative prompt 系统。
 
-- [ ] 新增场景级 negative prompt 模板库
-- [ ] 支持 `--ban` 参数，由用户追加自定义禁止项
-- [ ] 合并质量负面词、风格负面词、场景负面词和用户禁止项
-- [ ] 对 negative prompt 做稳定去重和顺序控制
-- [ ] 支持 brief 中的“禁止”字段自动进入 negative prompt
-- [ ] 增加产品摄影 / UI 界面 / 小红书封面 / 视频分镜等场景负面词预设
+- [x] 新增场景级 negative prompt 模板库（`data/negatives.csv`，含 8 个预设：产品摄影、UI 界面、视频分镜、小红书封面、人像摄影、风光摄影、赛博朋克、水彩）
+- [x] 支持 `--ban` 参数，由用户追加自定义禁止项（已接入 generate/transform/batch/prompt/brief）
+- [x] 合并质量负面词、风格负面词、场景负面词和用户禁止项（`generate_negative_prompt` 统一合并）
+- [x] 对 negative prompt 做稳定去重和顺序控制（已有 `unique_terms` 保障）
+- [x] 支持 brief 中的"禁止"字段自动进入 negative prompt（`brief_to_prompt` 已修复，原先是追加到 prompt 中错误）
+- [x] 增加产品摄影 / UI 界面 / 小红书封面 / 视频分镜等场景负面词预设（`data/negatives.csv`）
 
 #### 4.6 Agent 可读请求体 Profile 与参考图输入
 
