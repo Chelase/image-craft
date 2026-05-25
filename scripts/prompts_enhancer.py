@@ -344,14 +344,42 @@ def unique_terms(terms: list[str]) -> list[str]:
     return unique
 
 
+def load_scene_negatives(scene: str | None = None) -> list[str]:
+    """Load scene-specific negative terms from data/negatives.csv.
+
+    If a scene name is provided, return the matched scene's negative terms.
+    Otherwise return an empty list.
+    """
+    if not scene:
+        return []
+    filepath = data_dir() / "negatives.csv"
+    if not filepath.exists():
+        return []
+    import csv
+    scene_lower = scene.lower().strip()
+    with open(filepath, "r", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            row_id = row.get("id", "").lower().strip()
+            row_name = row.get("name_cn", "").lower().strip()
+            if row_id == scene_lower or row_name == scene_lower:
+                neg = row.get("negative_prompt", "").strip()
+                if neg:
+                    return [t.strip() for t in neg.split(",") if t.strip()]
+    return []
+
+
 def generate_negative_prompt(
     style: dict[str, Any] | None = None,
     styles: list[StyleWeight] | None = None,
+    scene_terms: str = "",
+    ban_terms: str = "",
 ) -> str:
     """Generate a negative prompt.
 
     Always include general quality negatives.
     If a style is provided, also append the style's negative_prompt column.
+    If scene_terms is provided, parse them as comma-separated scene negatives.
+    If ban_terms is provided, parse them as user-provided ban terms.
     """
     parts = list(QUALITY_NEGATIVE)
     if style:
@@ -362,6 +390,10 @@ def generate_negative_prompt(
         style_neg = style_dict.get("negative_prompt", "").strip()
         if style_neg:
             parts.extend(term.strip() for term in style_neg.split(",") if term.strip())
+    if scene_terms:
+        parts.extend(t.strip() for t in scene_terms.split(",") if t.strip())
+    if ban_terms:
+        parts.extend(t.strip() for t in ban_terms.split(",") if t.strip())
     return ", ".join(unique_terms(parts))
 
 
@@ -377,6 +409,8 @@ def enhance(
     style_migration_strength: float | None = None,
     include_negative: bool = False,
     inject_quality_terms: bool = True,
+    scene_terms: str = "",
+    ban_terms: str = "",
 ) -> dict[str, Any]:
     """Fully enhance a user prompt.
 
@@ -429,7 +463,7 @@ def enhance(
         enhanced = inject_quality(enhanced)
 
     # Negative prompt
-    negative = generate_negative_prompt(style, weighted_styles) if include_negative else ""
+    negative = generate_negative_prompt(style, weighted_styles, scene_terms, ban_terms) if include_negative else ""
 
     return {
         "original_prompt": prompt,
