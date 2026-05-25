@@ -294,6 +294,26 @@ def apply_style_mix_enhancement(prompt: str, styles: list[StyleWeight]) -> str:
     return enhanced
 
 
+def style_migration_instruction(prompt: str, style: dict[str, Any], strength: float = 1.0) -> str:
+    """Build an image-to-image instruction for migrating a source image toward a style."""
+    bounded_strength = min(1.0, max(0.0, strength))
+    style_percent = round(bounded_strength * 100)
+    source_percent = 100 - style_percent
+    style_name = style.get("name_en") or style.get("id", "target style")
+    keywords = style.get("keywords", "").strip()
+    normalized_prompt = normalize_visual_prompt(prompt)
+
+    parts = [
+        normalized_prompt,
+        f"target style: {style_name}",
+        f"style migration strength: {style_percent}%",
+        f"preserve {source_percent}% of the source image structure, subject identity, and composition",
+    ]
+    if keywords:
+        parts.append(f"style keywords: {keywords}")
+    return ", ".join(parts)
+
+
 # ----------------------------------------------------------------------
 # Quality injection
 # ----------------------------------------------------------------------
@@ -354,6 +374,7 @@ def enhance(
     style_id: str | None = None,
     style_dict: dict[str, Any] | None = None,
     style_dicts: list[StyleWeight] | None = None,
+    style_migration_strength: float | None = None,
     include_negative: bool = False,
     inject_quality_terms: bool = True,
 ) -> dict[str, Any]:
@@ -396,7 +417,9 @@ def enhance(
 
     # Apply style enhancement
     enhanced = prompt
-    if weighted_styles:
+    if style and style_migration_strength is not None:
+        enhanced = style_migration_instruction(prompt, style, style_migration_strength)
+    elif weighted_styles:
         enhanced = apply_style_mix_enhancement(prompt, weighted_styles)
     elif style:
         enhanced = apply_style_enhancement(prompt, style)

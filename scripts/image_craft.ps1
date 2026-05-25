@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("generate", "transform", "suggest", "prompt")]
+    [ValidateSet("generate", "transform", "suggest", "prompt", "batch")]
     [string]$Command,
 
     [Parameter(Mandatory = $true)]
@@ -22,6 +22,18 @@ param(
 
     [string]$StyleMix,
 
+    [string]$StyleStrength,
+
+    [string]$Styles,
+
+    [switch]$Explore,
+
+    [int]$Variants = 1,
+
+    [string]$OutputDir,
+
+    [string[]]$AbLabel,
+
     [string]$Template,
 
     [string[]]$Var,
@@ -41,6 +53,8 @@ param(
     [switch]$DesignSystem,
 
     [switch]$Random,
+
+    [switch]$DryRun,
 
     [switch]$Negative,
 
@@ -331,6 +345,8 @@ function Invoke-PromptPreviewScript {
 
         [string]$InputStyleMix,
 
+        [string]$InputStyleStrength,
+
         [string]$InputTemplate,
 
         [string[]]$InputVar,
@@ -351,6 +367,9 @@ function Invoke-PromptPreviewScript {
     }
     if (-not [string]::IsNullOrWhiteSpace($InputStyleMix)) {
         $arguments += @("--style-mix", $InputStyleMix)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($InputStyleStrength)) {
+        $arguments += @("--style-strength", $InputStyleStrength)
     }
     if (-not [string]::IsNullOrWhiteSpace($InputTemplate)) {
         $arguments += @("--template", $InputTemplate)
@@ -373,6 +392,64 @@ function Invoke-PromptPreviewScript {
     }
     if ($NoQuality) {
         $arguments += "--no-quality"
+    }
+    & $python @arguments
+}
+
+function Invoke-BatchScript {
+    $scriptPath = Join-Path $PSScriptRoot "image_craft.py"
+    $python = Get-PythonCommand
+    $arguments = @($scriptPath, "batch", "--prompt", $Prompt, "--variants", [string]$Variants, "--format", $Format)
+    if (-not [string]::IsNullOrWhiteSpace($Styles)) {
+        $arguments += @("--styles", $Styles)
+    }
+    if ($Explore) {
+        $arguments += "--explore"
+    }
+    if ($Limit) {
+        $arguments += @("--limit", [string]$Limit)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Category)) {
+        $arguments += @("--category", $Category)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OutputDir)) {
+        $arguments += @("--output-dir", $OutputDir)
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($Output)) {
+        $arguments += @("--output-dir", $Output)
+    }
+    foreach ($label in @($AbLabel)) {
+        if (-not [string]::IsNullOrWhiteSpace($label)) {
+            $expandedLabels = $label -split ","
+            foreach ($expandedLabel in $expandedLabels) {
+                if (-not [string]::IsNullOrWhiteSpace($expandedLabel)) {
+                    $arguments += @("--ab-label", $expandedLabel.Trim())
+                }
+            }
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Model)) {
+        $arguments += @("--model", $Model)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Template)) {
+        $arguments += @("--template", $Template)
+    }
+    foreach ($variable in @($Var)) {
+        if (-not [string]::IsNullOrWhiteSpace($variable)) {
+            $arguments += @("--var", $variable)
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Color)) {
+        $arguments += @("--color", $Color)
+    }
+    if ($Negative) {
+        $arguments += "--negative"
+    }
+    if ($NoQuality) {
+        $arguments += "--no-quality"
+    }
+    if ($DryRun) {
+        $arguments += "--dry-run"
     }
     & $python @arguments
 }
@@ -429,7 +506,15 @@ if ($Command -eq "suggest") {
 }
 
 if ($Command -eq "prompt") {
-    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat $Format
+    Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat $Format
+    return
+}
+
+if ($Command -eq "batch") {
+    if ([string]::IsNullOrWhiteSpace($OutputDir) -and [string]::IsNullOrWhiteSpace($Output)) {
+        throw "-OutputDir or -Output is required for batch."
+    }
+    Invoke-BatchScript
     return
 }
 
@@ -438,7 +523,7 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
 }
 
 $config = Get-ImageCraftConfig
-$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat "json"
+$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -OutputFormat "json"
 $promptPreview = $promptPreviewJson | ConvertFrom-Json
 $finalPrompt = $promptPreview.enhanced_prompt
 $negativePrompt = $promptPreview.negative_prompt

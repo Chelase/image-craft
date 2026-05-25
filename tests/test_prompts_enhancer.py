@@ -6,8 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from prompts_enhancer import enhance, normalize_visual_prompt  # noqa: E402
-from image_craft import render_template, resolve_style_mix  # noqa: E402
+from prompts_enhancer import enhance, normalize_visual_prompt, style_migration_instruction  # noqa: E402
+from image_craft import build_batch_plan, build_parser, prepare_prompt, render_template, resolve_style_mix  # noqa: E402
 
 
 class PromptEnhancerTests(unittest.TestCase):
@@ -74,6 +74,81 @@ class PromptEnhancerTests(unittest.TestCase):
         style_mix = resolve_style_mix("digital:2,3d:1")
 
         self.assertEqual([style.get("id") for style, _ in style_mix], ["cyberpunk", "blender-render"])
+
+    def test_style_migration_instruction_preserves_source_with_partial_strength(self) -> None:
+        style = resolve_style_mix("watercolor:1")[0][0]
+
+        instruction = style_migration_instruction("preserve the portrait", style, 0.35)
+
+        self.assertIn("preserve the portrait", instruction)
+        self.assertIn("target style: Watercolor", instruction)
+        self.assertIn("style migration strength: 35%", instruction)
+        self.assertIn("preserve 65% of the source image", instruction)
+        self.assertIn("watercolor,soft,translucent,flowing", instruction)
+
+    def test_prompt_preview_accepts_style_migration_strength(self) -> None:
+        args = build_parser().parse_args([
+            "prompt",
+            "--prompt", "preserve the portrait",
+            "--style-name", "watercolor",
+            "--style-strength", "0.35",
+            "--format", "json",
+        ])
+
+        enhanced_prompt, _, style, style_mix = prepare_prompt(args)
+
+        self.assertEqual(style_mix, [])
+        self.assertEqual(style.get("id"), "watercolor")
+        self.assertIn("style migration strength: 35%", enhanced_prompt)
+        self.assertIn("preserve 65% of the source image", enhanced_prompt)
+
+    def test_prompt_preview_rejects_out_of_range_style_migration_strength(self) -> None:
+        args = build_parser().parse_args([
+            "prompt",
+            "--prompt", "preserve the portrait",
+            "--style-name", "watercolor",
+            "--style-strength", "1.5",
+        ])
+
+        with self.assertRaises(SystemExit):
+            prepare_prompt(args)
+
+    def test_batch_plan_builds_style_variants_with_ab_labels(self) -> None:
+        args = build_parser().parse_args([
+            "batch",
+            "--prompt", "future city",
+            "--styles", "cyberpunk,watercolor",
+            "--output-dir", "outputs/batch",
+            "--ab-label", "A",
+            "--ab-label", "B",
+            "--dry-run",
+            "--format", "json",
+        ])
+
+        plan = build_batch_plan(args)
+
+        self.assertEqual([variant["style_id"] for variant in plan["variants"]], ["cyberpunk", "watercolor"])
+        self.assertEqual([variant["ab_label"] for variant in plan["variants"]], ["A", "B"])
+        self.assertEqual([variant["output"] for variant in plan["variants"]], [
+            "outputs/batch/01-cyberpunk.png",
+            "outputs/batch/02-watercolor.png",
+        ])
+        self.assertIn("cyberpunk style", plan["variants"][0]["enhanced_prompt"])
+
+    def test_batch_plan_explore_mode_uses_style_search(self) -> None:
+        args = build_parser().parse_args([
+            "batch",
+            "--prompt", "cyberpunk city",
+            "--explore",
+            "--limit", "2",
+            "--output-dir", "outputs/explore",
+            "--dry-run",
+        ])
+
+        plan = build_batch_plan(args)
+
+        self.assertEqual(len(plan["variants"]), 2)
+        self.assertEqual(plan["mode"], "explore")
 
 
 if __name__ == "__main__":

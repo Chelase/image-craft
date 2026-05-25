@@ -271,6 +271,13 @@ def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | No
     """Enhance the prompt and return (final_prompt, negative_prompt, style_dict, style_mix)."""
     style_mix = resolve_style_mix(getattr(args, "style_mix", None))
     style = resolve_style(style_name=args.style_name, style_id=args.style_id)
+    style_strength = getattr(args, "style_strength", None)
+    if style_strength is not None and not 0.0 <= style_strength <= 1.0:
+        raise SystemExit("--style-strength must be between 0.0 and 1.0.")
+    if style_strength is not None and style_mix:
+        raise SystemExit("--style-strength cannot be combined with --style-mix.")
+    if style_strength is not None and style is None:
+        raise SystemExit("--style-strength requires --style-id or --style-name.")
     prompt, _, _ = apply_template_and_color(args)
 
     result = enhance(
@@ -278,11 +285,105 @@ def prepare_prompt(args: argparse.Namespace) -> tuple[str, str | None, dict | No
         style_id=args.style_id,
         style_dict=style,
         style_dicts=style_mix,
+        style_migration_strength=style_strength,
         include_negative=args.negative,
         inject_quality_terms=not args.no_quality,
     )
 
     return result["enhanced_prompt"], result["negative_prompt"] if args.negative else None, style, style_mix
+
+
+def split_style_refs(value: str | None) -> list[str]:
+    """Split a comma/plus separated style reference list."""
+    refs: list[str] = []
+    for raw_part in re.split(r"[,+]", value or ""):
+        part = raw_part.strip()
+        if part and part not in refs:
+            refs.append(part)
+    return refs
+
+
+def resolve_batch_styles(args: argparse.Namespace) -> tuple[str, list[dict]]:
+    """Resolve styles for batch variants from explicit refs or explore mode."""
+    style_refs = split_style_refs(getattr(args, "styles", None))
+    if style_refs:
+        styles = []
+        for style_ref in style_refs:
+            style = resolve_style(style_id=style_ref) or resolve_style(style_name=style_ref)
+            if not style:
+                raise SystemExit(f"Could not resolve style in --styles: {style_ref}")
+            styles.append(style)
+        return "batch", styles
+
+    if getattr(args, "explore", False):
+        styles = search_styles(args.prompt, limit=args.limit, category=args.category)
+        if not styles:
+            styles = get_random_styles(args.limit)
+        return "explore", styles
+
+    raise SystemExit("batch requires --styles or --explore.")
+
+
+def batch_output_path(output_dir: Path, style_id: str, index: int, variant_index: int, variants_per_style: int) -> str:
+    """Return a stable output path for a batch variant."""
+    safe_style_id = re.sub(r"[^a-zA-Z0-9_-]+", "-", style_id).strip("-") or "style"
+    suffix = f"-{variant_index}" if variants_per_style > 1 else ""
+    directory = str(output_dir).replace(os.sep, "/").rstrip("/")
+    return f"{directory}/{index:02d}-{safe_style_id}{suffix}.png"
+
+
+def ab_label_for(labels: list[str], index: int) -> str:
+    """Return an A/B label for a one-based variant index."""
+    if index <= len(labels):
+        return labels[index - 1]
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    if index <= len(alphabet):
+        return alphabet[index - 1]
+    return f"V{index}"
+
+
+def build_batch_plan(args: argparse.Namespace) -> dict:
+    """Build a deterministic batch generation plan without calling the image API."""
+    if args.variants <= 0:
+        raise SystemExit("--variants must be positive.")
+
+    mode, styles = resolve_batch_styles(args)
+    base_prompt, template, color = apply_template_and_color(args)
+    labels = [label.strip() for label in getattr(args, "ab_label", []) if label.strip()]
+    variants = []
+    index = 1
+
+    for style in styles:
+        for variant_index in range(1, args.variants + 1):
+            result = enhance(
+                prompt=base_prompt,
+                style_dict=style,
+                include_negative=args.negative,
+                inject_quality_terms=not args.no_quality,
+            )
+            style_id = style.get("id", "style")
+            variants.append({
+                "index": index,
+                "variant": variant_index,
+                "ab_label": ab_label_for(labels, index),
+                "style_id": style_id,
+                "style_name_cn": style.get("name_cn", ""),
+                "style_name_en": style.get("name_en", ""),
+                "output": batch_output_path(args.output_dir, style_id, index, variant_index, args.variants),
+                "enhanced_prompt": result["enhanced_prompt"],
+                "negative_prompt": result["negative_prompt"],
+            })
+            index += 1
+
+    return {
+        "prompt": args.prompt,
+        "base_prompt": base_prompt,
+        "mode": mode,
+        "variants_per_style": args.variants,
+        "template_id": template.get("id", "") if template else "",
+        "color_id": color.get("id", "") if color else "",
+        "variants": variants,
+    }
 
 
 def generate(args: argparse.Namespace) -> None:
@@ -322,6 +423,8 @@ def generate(args: argparse.Namespace) -> None:
     elif style:
         output_info["style_id"] = style.get("id", "")
         output_info["style_name_cn"] = style.get("name_cn", "")
+    if getattr(args, "style_strength", None) is not None:
+        output_info["style_migration_strength"] = args.style_strength
     if template:
         output_info["template_id"] = template.get("id", "")
     if color:
@@ -330,6 +433,41 @@ def generate(args: argparse.Namespace) -> None:
         output_info["negative_prompt"] = negative_prompt
 
     print(json.dumps(output_info, ensure_ascii=False))
+
+
+def batch(args: argparse.Namespace) -> None:
+    """Generate or preview multiple style variants for the same prompt."""
+    plan = build_batch_plan(args)
+    if args.dry_run:
+        if args.format == "json":
+            print(json.dumps(plan, ensure_ascii=False, indent=2))
+            return
+        print(f"Batch plan for: {plan['prompt']}")
+        for variant in plan["variants"]:
+            print(f"{variant['ab_label']}: {variant['style_id']} -> {variant['output']}")
+        return
+
+    config = load_config()
+    model = args.model or config["model"]
+    for variant in plan["variants"]:
+        payload: dict = {"model": model, "prompt": variant["enhanced_prompt"]}
+        if variant["negative_prompt"]:
+            payload["negative_prompt"] = variant["negative_prompt"]
+        response = post_json(
+            f"{config['base_url']}/v1/images/generations",
+            payload,
+            config["api_key"],
+        )
+        image_b64, revised_prompt = extract_image_b64(response)
+        save_image(image_b64, Path(variant["output"]))
+        variant["model"] = model
+        variant["revised_prompt"] = revised_prompt
+
+    if args.format == "json":
+        print(json.dumps(plan, ensure_ascii=False, indent=2))
+        return
+    for variant in plan["variants"]:
+        print(f"{variant['ab_label']}: saved {variant['output']}")
 
 
 def transform(args: argparse.Namespace) -> None:
@@ -380,6 +518,8 @@ def transform(args: argparse.Namespace) -> None:
     elif style:
         output_info["style_id"] = style.get("id", "")
         output_info["style_name_cn"] = style.get("name_cn", "")
+    if getattr(args, "style_strength", None) is not None:
+        output_info["style_migration_strength"] = args.style_strength
     if template:
         output_info["template_id"] = template.get("id", "")
     if color:
@@ -451,6 +591,8 @@ def preview_prompt(args: argparse.Namespace) -> None:
         output["style_id"] = style.get("id", "")
         output["style_name_cn"] = style.get("name_cn", "")
         output["style_name_en"] = style.get("name_en", "")
+    if getattr(args, "style_strength", None) is not None:
+        output["style_migration_strength"] = args.style_strength
     if template:
         output["template_id"] = template.get("id", "")
         output["template_name"] = template.get("name", "")
@@ -497,6 +639,26 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--no-quality", action="store_true", help="Skip quality term injection")
     gen.set_defaults(func=generate)
 
+    # ----- batch -----
+    batch_parser = subparsers.add_parser("batch", help="Generate multiple style variants for one prompt.")
+    batch_parser.add_argument("--prompt", required=True)
+    batch_parser.add_argument("--styles", default=None, help="Comma-separated style IDs/names to generate as variants")
+    batch_parser.add_argument("--explore", action="store_true", help="Auto-select styles from local search recommendations")
+    batch_parser.add_argument("--limit", type=int, default=3, help="Max styles in explore mode")
+    batch_parser.add_argument("--category", default=None, help="Optional style category filter for explore mode")
+    batch_parser.add_argument("--variants", type=int, default=1, help="Number of variants per style")
+    batch_parser.add_argument("--output-dir", required=True, type=Path)
+    batch_parser.add_argument("--ab-label", action="append", default=[], help="Optional A/B label for each generated variant; repeat as needed")
+    batch_parser.add_argument("--model", default=None)
+    batch_parser.add_argument("--template", default=None)
+    batch_parser.add_argument("--var", action="append", default=[])
+    batch_parser.add_argument("--color", default=None)
+    batch_parser.add_argument("--negative", action="store_true")
+    batch_parser.add_argument("--no-quality", action="store_true")
+    batch_parser.add_argument("--dry-run", action="store_true", help="Print the batch plan without calling the image API")
+    batch_parser.add_argument("-f", "--format", choices=["text", "json"], default="json")
+    batch_parser.set_defaults(func=batch)
+
     # ----- transform -----
     trans = subparsers.add_parser("transform", help="Transform an input image with a text instruction.")
     trans.add_argument("--prompt", required=True)
@@ -506,6 +668,7 @@ def build_parser() -> argparse.ArgumentParser:
     trans.add_argument("--style-id", default=None)
     trans.add_argument("--style-name", default=None)
     trans.add_argument("--style-mix", default=None)
+    trans.add_argument("--style-strength", type=float, default=None, help="Style migration strength from 0.0 to 1.0")
     trans.add_argument("--template", default=None)
     trans.add_argument("--var", action="append", default=[])
     trans.add_argument("--color", default=None)
@@ -530,6 +693,7 @@ def build_parser() -> argparse.ArgumentParser:
     prev.add_argument("--style-id", default=None, help="Style ID or category to apply (e.g. blender-render or 3d)")
     prev.add_argument("--style-name", default=None, help="Style name or category to search and auto-apply")
     prev.add_argument("--style-mix", default=None, help="Weighted styles, e.g. cyberpunk:0.7,blender-render:0.3")
+    prev.add_argument("--style-strength", type=float, default=None, help="Preview style migration strength from 0.0 to 1.0")
     prev.add_argument("--template", default=None, help="Prompt template ID/name/query to render before preview")
     prev.add_argument("--var", action="append", default=[], help="Template variable in key=value form; repeat as needed")
     prev.add_argument("--color", default=None, help="Color palette name/query to append to the prompt")
