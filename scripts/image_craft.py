@@ -14,6 +14,13 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from payload_builder import (
+    PROFILES as PAYLOAD_PROFILES,
+    VALID_PROFILES,
+    build_payload as build_api_payload,
+    resolve_profile,
+    resolve_reference_images,
+)
 from prompts_enhancer import StyleWeight, enhance, is_simple_prompt, load_styles
 from search import (
     format_color,
@@ -105,8 +112,15 @@ def extract_image_b64(response: dict) -> tuple[str, str | None]:
     data = response.get("data")
     if isinstance(data, list) and data:
         first = data[0]
-        if isinstance(first, dict) and first.get("b64_json"):
-            return first["b64_json"], first.get("revised_prompt")
+        if isinstance(first, dict):
+            # b64_json response
+            if first.get("b64_json"):
+                return first["b64_json"], first.get("revised_prompt")
+            # URL response — download the image
+            url = first.get("url")
+            if url:
+                img_b64 = _download_image_url(url)
+                return img_b64, first.get("revised_prompt")
 
     choices = response.get("choices")
     if isinstance(choices, list) and choices:
@@ -118,6 +132,17 @@ def extract_image_b64(response: dict) -> tuple[str, str | None]:
                 return re.sub(r"\s+", "", match.group(1)), None
 
     raise SystemExit("Could not find image base64 in API response.")
+
+
+def _download_image_url(url: str) -> str:
+    """Download an image from a URL and return its base64-encoded content."""
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            body = resp.read()
+    except (urllib.error.HTTPError, urllib.error.URLError) as exc:
+        raise SystemExit(f"Failed to download image from URL: {exc}") from exc
+    return base64.b64encode(body).decode("ascii")
 
 
 def save_image(image_b64: str, output: Path) -> None:
@@ -665,12 +690,27 @@ def generate(args: argparse.Namespace) -> None:
     enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     _, template, color = apply_template_and_color(args)
 
-    payload: dict = {"model": model, "prompt": enhanced_prompt}
-    if negative_prompt:
-        payload["negative_prompt"] = negative_prompt
+    # Resolve profile and reference images
+    ref_images = resolve_reference_images(
+        images=args.image if args.image else None,
+        image_urls=args.image_url if args.image_url else None,
+    )
+    profile = resolve_profile(
+        has_reference_image=bool(ref_images),
+        explicit_profile=args.profile,
+    )
+    payload, endpoint = build_api_payload(
+        profile,
+        model=model,
+        enhanced_prompt=enhanced_prompt,
+        negative_prompt=negative_prompt or None,
+        size=args.size,
+        response_format=args.response_format,
+        reference_images=ref_images or None,
+    )
 
     response = post_json(
-        f"{config['base_url']}/v1/images/generations",
+        f"{config['base_url']}{endpoint}",
         payload,
         config["api_key"],
     )
@@ -722,11 +762,14 @@ def batch(args: argparse.Namespace) -> None:
     config = load_config()
     model = args.model or config["model"]
     for variant in plan["variants"]:
-        payload: dict = {"model": model, "prompt": variant["enhanced_prompt"]}
-        if variant["negative_prompt"]:
-            payload["negative_prompt"] = variant["negative_prompt"]
+        payload, endpoint = build_api_payload(
+            "images-generations",
+            model=model,
+            enhanced_prompt=variant["enhanced_prompt"],
+            negative_prompt=variant["negative_prompt"] or None,
+        )
         response = post_json(
-            f"{config['base_url']}/v1/images/generations",
+            f"{config['base_url']}{endpoint}",
             payload,
             config["api_key"],
         )
@@ -749,23 +792,27 @@ def transform(args: argparse.Namespace) -> None:
     enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     _, template, color = apply_template_and_color(args)
 
-    payload: dict = {
-        "model": model,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": enhanced_prompt},
-                    {"type": "image_url", "image_url": {"url": image_data_url(args.input)}},
-                ],
-            }
-        ],
-    }
-    if negative_prompt:
-        payload["negative_prompt"] = negative_prompt
+    # Resolve profile and reference images
+    ref_images = resolve_reference_images(
+        image_urls=args.image_url if args.image_url else None,
+    )
+    profile = resolve_profile(
+        is_transform=True,
+        has_reference_image=bool(ref_images),
+        explicit_profile=args.profile,
+    )
+    payload, endpoint = build_api_payload(
+        profile,
+        model=model,
+        enhanced_prompt=enhanced_prompt,
+        negative_prompt=negative_prompt or None,
+        size=args.size,
+        input_image_path=args.input,
+        reference_images=ref_images or None,
+    )
 
     response = post_json(
-        f"{config['base_url']}/v1/chat/completions",
+        f"{config['base_url']}{endpoint}",
         payload,
         config["api_key"],
     )
@@ -911,6 +958,11 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--no-quality", action="store_true", help="Skip quality term injection")
     gen.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
     gen.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms (e.g. xiaohongshu, portrait)")
+    gen.add_argument("--profile", default=None, choices=VALID_PROFILES, help="Request body profile (auto-detected by default)")
+    gen.add_argument("--image", action="append", default=[], type=Path, help="Local reference image path; repeat for multiple")
+    gen.add_argument("--image-url", action="append", default=[], help="Remote reference image URL; repeat for multiple")
+    gen.add_argument("--size", default=None, help="Image size, e.g. 1024x1024")
+    gen.add_argument("--response-format", default=None, choices=["url", "b64_json"], help="API response format")
     gen.set_defaults(func=generate)
 
     # ----- batch -----
@@ -966,6 +1018,10 @@ def build_parser() -> argparse.ArgumentParser:
     trans.add_argument("--no-quality", action="store_true")
     trans.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
     trans.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms")
+    trans.add_argument("--profile", default=None, choices=VALID_PROFILES, help="Request body profile (auto-detected by default)")
+    trans.add_argument("--image-url", action="append", default=[], help="Remote reference image URL; repeat for multiple")
+    trans.add_argument("--size", default=None, help="Image size, e.g. 1024x1024")
+    trans.add_argument("--response-format", default=None, choices=["url", "b64_json"], help="API response format")
     trans.set_defaults(func=transform)
 
     # ----- suggest -----

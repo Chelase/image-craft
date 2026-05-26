@@ -163,6 +163,18 @@ python scripts/image_craft.py batch --prompt "赛博朋克城市" --explore --li
 
 # 使用提示词模板和配色方案生成
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
+
+# 使用参考图生成（本地文件）
+python scripts/image_craft.py generate --prompt "一只类似的猫" --image reference_cat.png --style-name "watercolor" --output outputs/cat_ref.png
+
+# 使用参考图生成（远程 URL）
+python scripts/image_craft.py generate --prompt "一只类似的猫" --image-url "https://example.com/cat.jpg" --output outputs/cat_url.png
+
+# 指定图片尺寸和响应格式
+python scripts/image_craft.py generate --prompt "风景" --size 1024x1024 --response-format b64_json --output outputs/landscape.png
+
+# 使用指定的请求体 profile
+python scripts/image_craft.py generate --prompt "风景" --profile images-generations-reference --image-url "https://example.com/ref.jpg" --output outputs/landscape_ref.png
 ```
 
 ## 风格系统
@@ -189,6 +201,24 @@ python scripts/image_craft.py generate --prompt "东京街头" --template "urban
 如果同时提供 `--style-mix` 和 `--style-id` / `--style-name`，会优先使用风格混合配置。
 
 对于图编辑 / 图生图转换，使用 `--style-strength` 搭配 `--style-id` 或 `--style-name` 可以把输入图迁移到目标风格，同时保留原图结构和主体身份。例如 `--style-name watercolor --style-strength 0.65` 表示 65% 水彩风格迁移，并保留 35% 原图结构。
+
+## 请求体 Profile
+
+技能使用请求体 profile 来为不同使用场景构造正确的 API 请求体。默认情况下，profile 根据命令和参数自动检测：
+
+| 用户意图 | 默认 Profile | 端点 |
+|---|---|---|
+| 纯文生图 | `images-generations` | `/v1/images/generations` |
+| 带参考图的文生图 | `images-generations-reference` | `/v1/images/generations` |
+| 图片分析 / 图文理解 | `chat-completions-vision` | `/v1/chat/completions` |
+| 图片转换 / 改图 | `chat-completions-transform` | `/v1/chat/completions` |
+| 供应商特殊字段 | `custom` | （用户指定） |
+
+使用 `--profile` 可覆盖自动检测。参考图通过 `--image`（本地文件，可重复）或 `--image-url`（远程 URL，可重复）提供。
+
+**其他选项：**
+- `--size` — 图片尺寸（如 `1024x1024`、`1792x1024`）
+- `--response-format` — `url` 或 `b64_json`（控制 API 返回生成图片的方式）
 
 ## 可用模型
 

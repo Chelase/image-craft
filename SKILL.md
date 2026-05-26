@@ -30,7 +30,32 @@ Without these configurations, the skill will not work.
 
 - Text-to-image generation with `POST /v1/images/generations`.
 - Image transformation through the OpenAI-compatible chat endpoint with a data URL image input.
+- Reference image input (local files via `--image`, remote URLs via `--image-url`) for guided generation.
+- Request body profiles for automatic payload construction across different API patterns.
 - Optional direct API calls for custom payloads when the bundled script is too narrow.
+
+## Request Body Strategy
+
+The skill uses request body profiles to construct the correct API payload for different usage patterns. By default, the profile is auto-detected:
+
+| User Intent | Default Profile | Endpoint |
+|---|---|---|
+| Text-to-image (no reference) | `images-generations` | `/v1/images/generations` |
+| Text-to-image with reference image | `images-generations-reference` | `/v1/images/generations` |
+| Image analysis / vision | `chat-completions-vision` | `/v1/chat/completions` |
+| Image transformation | `chat-completions-transform` | `/v1/chat/completions` |
+| Custom supplier fields | `custom` | (user-specified) |
+
+**Agent decision rules:**
+- If the user provides a reference image alongside a text prompt → use `images-generations-reference` (or `chat-completions-vision` for analysis tasks).
+- If the user asks to modify/edit an existing image → use `chat-completions-transform`.
+- If the API documentation does not specify the correct payload shape for a supplier → ask the user which profile to use.
+- Use `--profile` to explicitly override auto-detection.
+
+**When to ask the user:**
+- The API documentation does not specify the reference image field name.
+- Multiple valid payload shapes exist for the same task.
+- The user requests supplier-specific advanced parameters.
 
 ## Configuration
 

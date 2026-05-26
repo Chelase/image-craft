@@ -196,7 +196,7 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 > 不把 API 请求体写死在某个供应商形态上，而是提供 Agent 可读的默认请求体模板、决策规则和可控覆盖机制。
 
 - [ ] 在 `SKILL.md` 新增 Request Body Strategy，明确 Agent 默认如何选择请求体 profile
-- [ ] 定义默认请求体 profiles：`images-generations`、`images-generations-reference`、`chat-completions-vision`、`chat-completions-transform`、`custom`
+- [x] 定义默认请求体 profiles：`images-generations`、`images-generations-reference`、`chat-completions-vision`、`chat-completions-transform`、`custom`
 - [ ] 新增 `scripts/payload_builder.py`，负责根据 profile 构造请求体并支持 deep merge override
 - [ ] 支持 `--profile` 参数，由 Agent 或用户选择请求体模板
 - [ ] 支持本地参考图 `--image`，自动转 base64 / data URL 后进入默认 profile
@@ -205,7 +205,7 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 - [ ] 支持 `--size` 和 `--response-format`，默认适配 Right Codes `/v1/images/generations`
 - [ ] 支持 `--payload-json` 和 `--payload-merge`，允许 Agent 根据供应商文档合并自定义字段
 - [ ] 修复 Python 端 `data[0].url` 响应下载能力，与 PowerShell 端保持一致
-- [ ] 更新 README / README_CN，区分“参考图输入 / 图文输入”和传统 multipart 文件上传
+- [x] 更新 README / README_CN，区分“参考图输入 / 图文输入”和传统 multipart 文件上传
 
 **Agent 默认决策：**
 | 用户意图 | 默认 profile | 说明 |

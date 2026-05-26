@@ -163,6 +163,18 @@ python scripts/image_craft.py batch --prompt "cyberpunk city" --explore --limit 
 
 # Generate with a prompt template and color palette
 python scripts/image_craft.py generate --prompt "东京街头" --template "urban landscape" --var city="Tokyo" --var "time of day=night" --color "midnight blue" --style-name "cyberpunk" --output outputs/tokyo.png
+
+# Generate with a reference image (local file)
+python scripts/image_craft.py generate --prompt "a cat like this one" --image reference_cat.png --style-name "watercolor" --output outputs/cat_ref.png
+
+# Generate with a reference image (remote URL)
+python scripts/image_craft.py generate --prompt "a cat like this one" --image-url "https://example.com/cat.jpg" --output outputs/cat_url.png
+
+# Generate with explicit size and response format
+python scripts/image_craft.py generate --prompt "a landscape" --size 1024x1024 --response-format b64_json --output outputs/landscape.png
+
+# Use a specific request body profile
+python scripts/image_craft.py generate --prompt "a landscape" --profile images-generations-reference --image-url "https://example.com/ref.jpg" --output outputs/landscape_ref.png
 ```
 
 ## Style System
@@ -189,6 +201,24 @@ Use `--style-mix` to combine multiple weighted styles, for example `cyberpunk:0.
 If `--style-mix` is provided together with `--style-id` or `--style-name`, the style mix takes precedence.
 
 For image-to-image transformations, use `--style-strength` with `--style-id` or `--style-name` to migrate the source image toward a target style while preserving source structure and subject identity. For example, `--style-name watercolor --style-strength 0.65` applies a 65% watercolor migration and preserves 35% of the source image structure.
+
+## Request Body Profiles
+
+The skill uses request body profiles to construct the correct API payload for different usage patterns. By default, the profile is auto-detected based on your command and arguments:
+
+| User Intent | Default Profile | Endpoint |
+|---|---|---|
+| Text-to-image | `images-generations` | `/v1/images/generations` |
+| Text-to-image with reference | `images-generations-reference` | `/v1/images/generations` |
+| Image analysis / vision | `chat-completions-vision` | `/v1/chat/completions` |
+| Image transformation | `chat-completions-transform` | `/v1/chat/completions` |
+| Custom supplier fields | `custom` | (user-specified) |
+
+Use `--profile` to override auto-detection. Reference images are provided via `--image` (local files, repeatable) or `--image-url` (remote URLs, repeatable).
+
+**Additional options:**
+- `--size` — image dimensions (e.g. `1024x1024`, `1792x1024`)
+- `--response-format` — `url` or `b64_json` (controls how the API returns the generated image)
 
 ## Models
 

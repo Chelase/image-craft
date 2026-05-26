@@ -20,8 +20,8 @@
 3. 根据任务再读取相关项目文档：
    - 功能与使用背景：`README.md` / `README_CN.md`
    - 技能元数据：`SKILL.md`
-   - 功能进度真来源：`docs/ROADMAP.md`
-   - GEO 工作真来源：`docs/GEO.md`
+   - 功能进度真来源：`project-docs/ROADMAP.md`
+   - GEO 工作真来源：`project-docs/GEO.md`
    - 数据 schema：`data/*.csv` 头行
    - 技能规范：`.agent-rules/skill-standards.md`
 
@@ -35,7 +35,7 @@
 2. 用户当前明确提出的要求
 3. `.agent-rules/` 下的规则
 4. 桥接文件（`CLAUDE.md` / `AGENTS.md`）中的摘要说明
-5. 单一事实来源文档（`docs/ROADMAP.md` / `docs/GEO.md` / `SKILL.md`）
+5. 单一事实来源文档（`project-docs/ROADMAP.md` / `project-docs/GEO.md` / `SKILL.md`）
 6. 其他项目文档中的补充描述
 
 如果其他项目文档与 `.agent-rules/` 或当前代码实现不一致，不要继续扩散不一致描述；应优先遵守当前有效规则与代码实现，并在任务允许时同步修正文档。
@@ -44,15 +44,15 @@
 
 本仓库是开源 AI Agent 图像生成技能（产品名 **Image Craft**），通过 OpenAI 兼容图片 API 实现文生图与图编辑。
 
-阶段状态（详见 `docs/ROADMAP.md`）：
+阶段状态（详见 `project-docs/ROADMAP.md`）：
 
 - Phase 1-3 已完成：数据层（CSV）、搜索引擎、CLI 集成
-- Phase 4 进行中：4.1 提示词优化器 ✓、4.2 风格混合器 ✓（迁移未做）、4.3/4.4/4.5 未做
-- Phase 5 GEO 启动：详见 `docs/GEO.md`
+- Phase 4 进行中：4.1 提示词优化器 ✓、4.2 风格混合器 ✓、4.3 批量生成 ✓、4.4 结构化 Brief ✓、4.5 场景化负面提示词 ✓、4.6 请求体 Profile 与参考图 ✓（批次1 完成，批次2 待做）
+- Phase 5 GEO 启动：详见 `project-docs/GEO.md`
 
 在新增功能或重构前：
 
-- 先确认是否在 `docs/ROADMAP.md` 范围内；超范围必须先与用户讨论
+- 先确认是否在 `project-docs/ROADMAP.md` 范围内；超范围必须先与用户讨论
 - 不要臆造模块结构；当前架构以 `scripts/` + `data/` + `tests/` 为准
 - 不要破坏 `data/*.csv` 已有 schema（见 §5.4）
 
@@ -65,8 +65,8 @@
 | 内容类型 | 真来源 | 桥接位置 |
 |---------|--------|---------|
 | 项目级 agent 规则 | `.agent-rules/` | `CLAUDE.md` |
-| 功能开发进度 | `docs/ROADMAP.md` | — |
-| GEO 工作执行 | `docs/GEO.md` | `docs/ROADMAP.md` §Phase 5 摘要 |
+| 功能开发进度 | `project-docs/ROADMAP.md` | — |
+| GEO 工作执行 | `project-docs/GEO.md` | `project-docs/ROADMAP.md` §Phase 5 摘要 |
 | 技能能力描述 | `SKILL.md` | `README.md` / `README_CN.md` 摘要 |
 | 风格/模板/配色数据 | `data/*.csv` | — |
 | CLI 参数与示例 | `scripts/image_craft.py` 的 `build_parser` | `README*.md` + `SKILL.md` 示例段 |

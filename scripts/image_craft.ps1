@@ -68,7 +68,19 @@ param(
 
     [string]$Ban,
 
-    [string]$Scene
+    [string]$Scene,
+
+    [ValidateSet("images-generations", "images-generations-reference", "chat-completions-vision", "chat-completions-transform", "custom")]
+    [string]$Profile,
+
+    [string[]]$Image,
+
+    [string[]]$ImageUrl,
+
+    [string]$Size,
+
+    [ValidateSet("url", "b64_json")]
+    [string]$ResponseFormat
 )
 
 $ErrorActionPreference = "Stop"
@@ -594,67 +606,71 @@ if ([string]::IsNullOrWhiteSpace($Output)) {
     throw "-Output is required for generate and transform."
 }
 
-$config = Get-ImageCraftConfig
-$promptPreviewJson = Invoke-PromptPreviewScript -InputPrompt $Prompt -InputStyleName $StyleName -InputStyleId $StyleId -InputStyleMix $StyleMix -InputStyleStrength $StyleStrength -InputTemplate $Template -InputVar $Var -InputColor $Color -InputBan $Ban -InputScene $Scene -OutputFormat "json"
-$promptPreview = $promptPreviewJson | ConvertFrom-Json
-$finalPrompt = $promptPreview.enhanced_prompt
-$negativePrompt = $promptPreview.negative_prompt
-
-if ($Command -eq "generate") {
-    $payload = @{
-        model = $config.Model
-        prompt = $finalPrompt
-    }
-    if (-not [string]::IsNullOrWhiteSpace($negativePrompt)) {
-        $payload.negative_prompt = $negativePrompt
-    }
-    $response = Invoke-RightCodesJson -Url "$($config.BaseUrl)/v1/images/generations" -Payload $payload -ApiKey $config.ApiKey
+# Shell out to Python for generate/transform to keep payload logic in one place
+$scriptPath = Join-Path $PSScriptRoot "image_craft.py"
+$python = Get-PythonCommand
+$arguments = @($scriptPath, $Command.ToLower(), "--prompt", $Prompt, "--output", $Output, "--format", "json")
+if (-not [string]::IsNullOrWhiteSpace($Model)) {
+    $arguments += @("--model", $Model)
 }
-else {
+if (-not [string]::IsNullOrWhiteSpace($StyleName)) {
+    $arguments += @("--style-name", $StyleName)
+}
+if (-not [string]::IsNullOrWhiteSpace($StyleId)) {
+    $arguments += @("--style-id", $StyleId)
+}
+if (-not [string]::IsNullOrWhiteSpace($StyleMix)) {
+    $arguments += @("--style-mix", $StyleMix)
+}
+if (-not [string]::IsNullOrWhiteSpace($StyleStrength)) {
+    $arguments += @("--style-strength", $StyleStrength)
+}
+if (-not [string]::IsNullOrWhiteSpace($Template)) {
+    $arguments += @("--template", $Template)
+}
+foreach ($variable in @($Var)) {
+    if (-not [string]::IsNullOrWhiteSpace($variable)) {
+        $arguments += @("--var", $variable)
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($Color)) {
+    $arguments += @("--color", $Color)
+}
+if ($Negative) {
+    $arguments += "--negative"
+}
+if ($NoQuality) {
+    $arguments += "--no-quality"
+}
+if (-not [string]::IsNullOrWhiteSpace($Ban)) {
+    $arguments += @("--ban", $Ban)
+}
+if (-not [string]::IsNullOrWhiteSpace($Scene)) {
+    $arguments += @("--scene", $Scene)
+}
+if (-not [string]::IsNullOrWhiteSpace($Profile)) {
+    $arguments += @("--profile", $Profile)
+}
+foreach ($img in @($Image)) {
+    if (-not [string]::IsNullOrWhiteSpace($img)) {
+        $arguments += @("--image", $img)
+    }
+}
+foreach ($imgUrl in @($ImageUrl)) {
+    if (-not [string]::IsNullOrWhiteSpace($imgUrl)) {
+        $arguments += @("--image-url", $imgUrl)
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($Size)) {
+    $arguments += @("--size", $Size)
+}
+if (-not [string]::IsNullOrWhiteSpace($ResponseFormat)) {
+    $arguments += @("--response-format", $ResponseFormat)
+}
+if ($Command -eq "transform") {
     if ([string]::IsNullOrWhiteSpace($InputImage)) {
         throw "-InputImage is required for transform."
     }
-    $payload = @{
-        model = $config.Model
-        messages = @(
-            @{
-                role = "user"
-                content = @(
-                    @{
-                        type = "text"
-                        text = $finalPrompt
-                    },
-                    @{
-                        type = "image_url"
-                        image_url = @{
-                            url = Convert-ImageToDataUrl -Path $InputImage
-                        }
-                    }
-                )
-            }
-        )
-    }
-    if (-not [string]::IsNullOrWhiteSpace($negativePrompt)) {
-        $payload.negative_prompt = $negativePrompt
-    }
-    $response = Invoke-RightCodesJson -Url "$($config.BaseUrl)/v1/chat/completions" -Payload $payload -ApiKey $config.ApiKey
+    $arguments += @("--input", $InputImage)
 }
-
-$imageResult = Get-ImageResult -Response $response
-if ($imageResult.ImageBase64) {
-    $savedPath = Save-ImageBase64 -ImageBase64 $imageResult.ImageBase64 -OutputPath $Output
-}
-elseif ($imageResult.ImageUrl) {
-    $savedPath = Save-ImageUrl -ImageUrl $imageResult.ImageUrl -OutputPath $Output
-}
-else {
-    throw "Could not find image data or URL in API response."
-}
-
-@{
-    output = $savedPath
-    image_url = $imageResult.ImageUrl
-    revised_prompt = $imageResult.RevisedPrompt
-    prompt = $finalPrompt
-    negative_prompt = $negativePrompt
-} | ConvertTo-Json -Depth 5
+& $python @arguments
