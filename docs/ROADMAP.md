@@ -201,7 +201,7 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 - [ ] 支持 `--profile` 参数，由 Agent 或用户选择请求体模板
 - [ ] 支持本地参考图 `--image`，自动转 base64 / data URL 后进入默认 profile
 - [ ] 支持远程参考图 `--image-url`，直接作为 URL 进入默认 profile
-- [ ] 支持多参考图输入，并保留用途声明：style / composition / subject / palette
+- [x] 支持多参考图输入，并保留用途声明：style / composition / subject / palette
 - [ ] 支持 `--size` 和 `--response-format`，默认适配 Right Codes `/v1/images/generations`
 - [ ] 支持 `--payload-json` 和 `--payload-merge`，允许 Agent 根据供应商文档合并自定义字段
 - [ ] 修复 Python 端 `data[0].url` 响应下载能力，与 PowerShell 端保持一致

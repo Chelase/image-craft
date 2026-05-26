@@ -219,6 +219,23 @@ Use `--profile` to override auto-detection. Reference images are provided via `-
 **Additional options:**
 - `--size` — image dimensions (e.g. `1024x1024`, `1792x1024`)
 - `--response-format` — `url` or `b64_json` (controls how the API returns the generated image)
+- `--payload-json` — complete request body as a JSON string (replaces the profile-built payload entirely)
+- `--payload-merge` — JSON to deep-merge into the profile-built payload (for supplier-specific fields)
+
+**Reference image purposes:**
+Append `::purpose` to `--image` or `--image-url` values to declare the role of each reference image:
+- `::style` — style reference (default when omitted)
+- `::composition` — layout/structure reference
+- `::subject` — subject/character reference
+- `::palette` — color palette reference
+
+```bash
+# Two reference images with different purposes
+python scripts/image_craft.py generate --prompt "a cat" --image-url "https://a.com/style.png::style" --image-url "https://b.com/comp.png::composition" --output out.png
+
+# Deep-merge a custom field into the payload
+python scripts/image_craft.py generate --prompt "a cat" --payload-merge '{"seed": 42}' --output out.png
+```
 
 ## Models
 

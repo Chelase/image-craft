@@ -57,6 +57,17 @@ The skill uses request body profiles to construct the correct API payload for di
 - Multiple valid payload shapes exist for the same task.
 - The user requests supplier-specific advanced parameters.
 
+**Payload override options:**
+- `--payload-json` — supply a complete JSON request body, replacing the profile-built payload entirely. Use when you know the exact API shape.
+- `--payload-merge` — supply a JSON fragment that is deep-merged into the profile-built payload. Use for adding supplier-specific fields like `seed`, `n`, or custom headers.
+
+**Reference image purposes:**
+Append `::purpose` to `--image` or `--image-url` values:
+- `::style` — style reference (default)
+- `::composition` — layout/structure reference
+- `::subject` — subject/character reference
+- `::palette` — color palette reference
+
 ## Configuration
 
 ### Required Settings

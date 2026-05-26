@@ -43,6 +43,8 @@ PROFILES: dict[str, dict[str, Any]] = {
 
 VALID_PROFILES = list(PROFILES.keys())
 
+VALID_IMAGE_PURPOSES = ("style", "composition", "subject", "palette")
+
 
 def resolve_profile(
     *,
@@ -85,32 +87,61 @@ def image_to_data_url(path: Path) -> str:
 
 
 def resolve_reference_images(
-    images: list[Path] | None = None,
+    images: list[Path | str] | None = None,
     image_urls: list[str] | None = None,
-) -> list[dict[str, str]]:
+    purposes: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Build a list of image references for the payload.
 
     Each reference is ``{"type": "image_url", "image_url": {"url": ...}}``.
+    If *purposes* is provided (same length as the combined images+urls list),
+    each reference also gets a ``"purpose"`` key with one of:
+    ``style``, ``composition``, ``subject``, ``palette``.
+
     Local files are converted to data-URLs; remote URLs are used as-is.
     """
-    refs: list[dict[str, str]] = []
+    refs: list[dict[str, Any]] = []
+    idx = 0
     if images:
         for p in images:
-            refs.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": image_to_data_url(p)},
-                }
-            )
+            path = Path(p) if not isinstance(p, Path) else p
+            ref: dict[str, Any] = {
+                "type": "image_url",
+                "image_url": {"url": image_to_data_url(path)},
+            }
+            if purposes and idx < len(purposes):
+                ref["purpose"] = purposes[idx]
+            refs.append(ref)
+            idx += 1
     if image_urls:
         for url in image_urls:
-            refs.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": url},
-                }
-            )
+            ref = {
+                "type": "image_url",
+                "image_url": {"url": url},
+            }
+            if purposes and idx < len(purposes):
+                ref["purpose"] = purposes[idx]
+            refs.append(ref)
+            idx += 1
     return refs
+
+
+def parse_image_arg(value: str) -> tuple[str, str | None]:
+    """Parse an --image or --image-url value that may include a purpose.
+
+    Format: ``path_or_url`` or ``path_or_url::purpose``.
+    Returns ``(path_or_url, purpose_or_none)``.
+    """
+    if "::" in value:
+        parts = value.rsplit("::", 1)
+        purpose = parts[1].strip().lower()
+        if purpose not in VALID_IMAGE_PURPOSES:
+            raise ValueError(
+                f"Invalid image purpose '{purpose}'. "
+                f"Valid purposes: {', '.join(VALID_IMAGE_PURPOSES)}"
+            )
+        return parts[0].strip(), purpose
+    return value, None
 
 
 # ---------------------------------------------------------------------------
@@ -227,8 +258,9 @@ def build_payload(
     size: str | None = None,
     response_format: str | None = None,
     input_image_path: Path | None = None,
-    reference_images: list[dict[str, str]] | None = None,
+    reference_images: list[dict[str, Any]] | None = None,
     overrides: dict[str, Any] | None = None,
+    payload_json: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Build an API request payload for the given *profile*.
 
@@ -236,12 +268,24 @@ def build_payload(
 
     *overrides* is deep-merged into the payload after the profile builder
     runs, allowing agents or users to add supplier-specific fields.
+
+    *payload_json* replaces the entire profile-built payload when provided.
+    Use it when the caller supplies a complete request body from a file or
+    inline JSON.
     """
     if profile not in PROFILES:
         raise ValueError(
             f"Unknown profile '{profile}'. "
             f"Valid profiles: {', '.join(VALID_PROFILES)}"
         )
+
+    # If a full payload is supplied, use it directly (with optional merge).
+    if payload_json is not None:
+        payload = dict(payload_json)
+        if overrides:
+            payload = deep_merge(payload, overrides)
+        endpoint = PROFILES[profile]["endpoint"]
+        return payload, endpoint
 
     builder_name = PROFILES[profile]["builder"]
     builder_fn = globals()[builder_name]

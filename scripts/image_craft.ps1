@@ -80,7 +80,11 @@ param(
     [string]$Size,
 
     [ValidateSet("url", "b64_json")]
-    [string]$ResponseFormat
+    [string]$ResponseFormat,
+
+    [string]$PayloadJson,
+
+    [string]$PayloadMerge
 )
 
 $ErrorActionPreference = "Stop"
@@ -666,6 +670,12 @@ if (-not [string]::IsNullOrWhiteSpace($Size)) {
 }
 if (-not [string]::IsNullOrWhiteSpace($ResponseFormat)) {
     $arguments += @("--response-format", $ResponseFormat)
+}
+if (-not [string]::IsNullOrWhiteSpace($PayloadJson)) {
+    $arguments += @("--payload-json", $PayloadJson)
+}
+if (-not [string]::IsNullOrWhiteSpace($PayloadMerge)) {
+    $arguments += @("--payload-merge", $PayloadMerge)
 }
 if ($Command -eq "transform") {
     if ([string]::IsNullOrWhiteSpace($InputImage)) {

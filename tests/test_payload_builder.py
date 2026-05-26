@@ -11,8 +11,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from payload_builder import (  # noqa: E402
     PROFILES,
     VALID_PROFILES,
+    VALID_IMAGE_PURPOSES,
     build_payload,
     deep_merge,
+    parse_image_arg,
     resolve_profile,
     resolve_reference_images,
 )
@@ -223,6 +225,101 @@ class ProfileDefinitionsTests(unittest.TestCase):
 
     def test_valid_profiles_matches_profiles_dict(self) -> None:
         self.assertEqual(set(VALID_PROFILES), set(PROFILES.keys()))
+
+
+class ParseImageArgTests(unittest.TestCase):
+    def test_plain_path_no_purpose(self) -> None:
+        path, purpose = parse_image_arg("/tmp/cat.png")
+        self.assertEqual(path, "/tmp/cat.png")
+        self.assertIsNone(purpose)
+
+    def test_path_with_purpose(self) -> None:
+        path, purpose = parse_image_arg("/tmp/cat.png::style")
+        self.assertEqual(path, "/tmp/cat.png")
+        self.assertEqual(purpose, "style")
+
+    def test_url_with_purpose(self) -> None:
+        url, purpose = parse_image_arg("https://example.com/img.png::composition")
+        self.assertEqual(url, "https://example.com/img.png")
+        self.assertEqual(purpose, "composition")
+
+    def test_all_valid_purposes(self) -> None:
+        for p in VALID_IMAGE_PURPOSES:
+            _, purpose = parse_image_arg(f"img.png::{p}")
+            self.assertEqual(purpose, p)
+
+    def test_invalid_purpose_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_image_arg("img.png::invalid")
+
+    def test_double_colon_in_path(self) -> None:
+        # rsplit ensures only the last :: is the separator
+        path, purpose = parse_image_arg("C:\\Users\\test::style")
+        self.assertEqual(path, "C:\\Users\\test")
+        self.assertEqual(purpose, "style")
+
+
+class ResolveReferenceImagesWithPurposeTests(unittest.TestCase):
+    def test_purposes_assigned_in_order(self) -> None:
+        refs = resolve_reference_images(
+            image_urls=["https://a.com/1.png", "https://b.com/2.png"],
+            purposes=["style", "composition"],
+        )
+        self.assertEqual(refs[0]["purpose"], "style")
+        self.assertEqual(refs[1]["purpose"], "composition")
+
+    def test_partial_purposes(self) -> None:
+        refs = resolve_reference_images(
+            image_urls=["https://a.com/1.png", "https://b.com/2.png"],
+            purposes=["style"],  # only first has purpose
+        )
+        self.assertEqual(refs[0]["purpose"], "style")
+        self.assertNotIn("purpose", refs[1])
+
+    def test_no_purposes(self) -> None:
+        refs = resolve_reference_images(
+            image_urls=["https://a.com/1.png"],
+        )
+        self.assertNotIn("purpose", refs[0])
+
+
+class PayloadJsonTests(unittest.TestCase):
+    def test_payload_json_replaces_profile_payload(self) -> None:
+        full_payload = {"model": "custom-model", "prompt": "direct", "extra": True}
+        payload, endpoint = build_payload(
+            "images-generations",
+            model="gpt-image-2",
+            enhanced_prompt="unused",
+            payload_json=full_payload,
+        )
+        self.assertEqual(payload["model"], "custom-model")
+        self.assertEqual(payload["prompt"], "direct")
+        self.assertTrue(payload["extra"])
+        # model/enhanced_prompt should NOT appear from profile builder
+        self.assertNotIn("negative_prompt", payload)
+
+    def test_payload_json_with_merge(self) -> None:
+        full_payload = {"model": "custom", "prompt": "direct"}
+        payload, endpoint = build_payload(
+            "images-generations",
+            model="gpt-image-2",
+            enhanced_prompt="unused",
+            payload_json=full_payload,
+            overrides={"extra_field": "added"},
+        )
+        self.assertEqual(payload["extra_field"], "added")
+
+    def test_payload_merge_without_payload_json(self) -> None:
+        payload, _ = build_payload(
+            "images-generations",
+            model="gpt-image-2",
+            enhanced_prompt="a cat",
+            overrides={"seed": 42, "custom": True},
+        )
+        self.assertEqual(payload["model"], "gpt-image-2")
+        self.assertEqual(payload["prompt"], "a cat")
+        self.assertEqual(payload["seed"], 42)
+        self.assertTrue(payload["custom"])
 
 
 if __name__ == "__main__":

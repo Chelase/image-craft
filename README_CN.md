@@ -219,6 +219,23 @@ python scripts/image_craft.py generate --prompt "风景" --profile images-genera
 **其他选项：**
 - `--size` — 图片尺寸（如 `1024x1024`、`1792x1024`）
 - `--response-format` — `url` 或 `b64_json`（控制 API 返回生成图片的方式）
+- `--payload-json` — 完整请求体 JSON 字符串（完全替换 profile 构造的请求体）
+- `--payload-merge` — JSON 字符串，deep merge 到 profile 构造的请求体（用于供应商特定字段）
+
+**参考图用途声明：**
+在 `--image` 或 `--image-url` 值后追加 `::purpose` 可声明每张参考图的用途：
+- `::style` — 风格参考（默认）
+- `::composition` — 构图/布局参考
+- `::subject` — 主体/角色参考
+- `::palette` — 配色参考
+
+```bash
+# 两张参考图，分别声明用途
+python scripts/image_craft.py generate --prompt "一只猫" --image-url "https://a.com/style.png::style" --image-url "https://b.com/comp.png::composition" --output out.png
+
+# Deep merge 自定义字段到请求体
+python scripts/image_craft.py generate --prompt "一只猫" --payload-merge '{"seed": 42}' --output out.png
+```
 
 ## 可用模型
 

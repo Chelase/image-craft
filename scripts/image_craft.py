@@ -18,6 +18,7 @@ from payload_builder import (
     PROFILES as PAYLOAD_PROFILES,
     VALID_PROFILES,
     build_payload as build_api_payload,
+    parse_image_arg,
     resolve_profile,
     resolve_reference_images,
 )
@@ -148,6 +149,17 @@ def _download_image_url(url: str) -> str:
 def save_image(image_b64: str, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(base64.b64decode(image_b64))
+
+
+def _parse_json_arg(value: str, arg_name: str) -> dict:
+    """Parse a JSON string from a CLI argument, raising on invalid JSON."""
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{arg_name}: invalid JSON — {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise SystemExit(f"{arg_name}: expected a JSON object, got {type(parsed).__name__}")
+    return parsed
 
 
 def resolve_style(style_name: str | None = None, style_id: str | None = None) -> dict | None:
@@ -690,11 +702,31 @@ def generate(args: argparse.Namespace) -> None:
     enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     _, template, color = apply_template_and_color(args)
 
-    # Resolve profile and reference images
+    # Parse reference images with optional purpose declarations
+    ref_image_paths: list[str] = []
+    ref_image_urls: list[str] = []
+    ref_purposes: list[str] = []
+    for img_val in (args.image or []):
+        path_str, purpose = parse_image_arg(str(img_val))
+        ref_image_paths.append(path_str)
+        if purpose:
+            ref_purposes.append(purpose)
+    for url_val in (args.image_url or []):
+        url_str, purpose = parse_image_arg(url_val)
+        ref_image_urls.append(url_str)
+        if purpose:
+            ref_purposes.append(purpose)
+
     ref_images = resolve_reference_images(
-        images=args.image if args.image else None,
-        image_urls=args.image_url if args.image_url else None,
+        images=[Path(p) for p in ref_image_paths] if ref_image_paths else None,
+        image_urls=ref_image_urls if ref_image_urls else None,
+        purposes=ref_purposes if ref_purposes else None,
     )
+
+    # Parse --payload-json and --payload-merge
+    payload_json = _parse_json_arg(args.payload_json, "--payload-json") if args.payload_json else None
+    payload_merge = _parse_json_arg(args.payload_merge, "--payload-merge") if args.payload_merge else None
+
     profile = resolve_profile(
         has_reference_image=bool(ref_images),
         explicit_profile=args.profile,
@@ -707,6 +739,8 @@ def generate(args: argparse.Namespace) -> None:
         size=args.size,
         response_format=args.response_format,
         reference_images=ref_images or None,
+        overrides=payload_merge,
+        payload_json=payload_json,
     )
 
     response = post_json(
@@ -792,10 +826,24 @@ def transform(args: argparse.Namespace) -> None:
     enhanced_prompt, negative_prompt, style, style_mix = prepare_prompt(args)
     _, template, color = apply_template_and_color(args)
 
-    # Resolve profile and reference images
+    # Parse reference images with optional purpose declarations
+    ref_image_urls: list[str] = []
+    ref_purposes: list[str] = []
+    for url_val in (args.image_url or []):
+        url_str, purpose = parse_image_arg(url_val)
+        ref_image_urls.append(url_str)
+        if purpose:
+            ref_purposes.append(purpose)
+
     ref_images = resolve_reference_images(
-        image_urls=args.image_url if args.image_url else None,
+        image_urls=ref_image_urls if ref_image_urls else None,
+        purposes=ref_purposes if ref_purposes else None,
     )
+
+    # Parse --payload-json and --payload-merge
+    payload_json = _parse_json_arg(args.payload_json, "--payload-json") if args.payload_json else None
+    payload_merge = _parse_json_arg(args.payload_merge, "--payload-merge") if args.payload_merge else None
+
     profile = resolve_profile(
         is_transform=True,
         has_reference_image=bool(ref_images),
@@ -809,6 +857,8 @@ def transform(args: argparse.Namespace) -> None:
         size=args.size,
         input_image_path=args.input,
         reference_images=ref_images or None,
+        overrides=payload_merge,
+        payload_json=payload_json,
     )
 
     response = post_json(
@@ -959,10 +1009,12 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
     gen.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms (e.g. xiaohongshu, portrait)")
     gen.add_argument("--profile", default=None, choices=VALID_PROFILES, help="Request body profile (auto-detected by default)")
-    gen.add_argument("--image", action="append", default=[], type=Path, help="Local reference image path; repeat for multiple")
-    gen.add_argument("--image-url", action="append", default=[], help="Remote reference image URL; repeat for multiple")
+    gen.add_argument("--image", action="append", default=[], help="Local reference image (path or path::purpose); repeat for multiple")
+    gen.add_argument("--image-url", action="append", default=[], help="Remote reference image URL (url or url::purpose); repeat for multiple")
     gen.add_argument("--size", default=None, help="Image size, e.g. 1024x1024")
     gen.add_argument("--response-format", default=None, choices=["url", "b64_json"], help="API response format")
+    gen.add_argument("--payload-json", default=None, help="Complete request body as JSON string (replaces profile-built payload)")
+    gen.add_argument("--payload-merge", default=None, help="JSON to deep-merge into the profile-built payload")
     gen.set_defaults(func=generate)
 
     # ----- batch -----
@@ -1019,9 +1071,11 @@ def build_parser() -> argparse.ArgumentParser:
     trans.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
     trans.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms")
     trans.add_argument("--profile", default=None, choices=VALID_PROFILES, help="Request body profile (auto-detected by default)")
-    trans.add_argument("--image-url", action="append", default=[], help="Remote reference image URL; repeat for multiple")
+    trans.add_argument("--image-url", action="append", default=[], help="Remote reference image URL (url or url::purpose); repeat for multiple")
     trans.add_argument("--size", default=None, help="Image size, e.g. 1024x1024")
     trans.add_argument("--response-format", default=None, choices=["url", "b64_json"], help="API response format")
+    trans.add_argument("--payload-json", default=None, help="Complete request body as JSON string (replaces profile-built payload)")
+    trans.add_argument("--payload-merge", default=None, help="JSON to deep-merge into the profile-built payload")
     trans.set_defaults(func=transform)
 
     # ----- suggest -----
