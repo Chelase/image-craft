@@ -16,7 +16,7 @@
 任何 agent 在本仓库执行分析、编辑、测试、提交准备之前，应按以下链路读取规则：
 
 1. `CLAUDE.md`（通用准则 + 入口指向）
-2. `.agent-rules/` 下实际存在的规则文件
+2. `.agent-rules/` 下实际存在的规则文件（全部）
 3. 根据任务再读取相关项目文档：
    - 功能与使用背景：`README.md` / `README_CN.md`
    - 技能元数据：`SKILL.md`
@@ -24,6 +24,8 @@
    - GEO 工作真来源：`docs/GEO.md`
    - 数据 schema：`data/*.csv` 头行
    - 技能规范：`.agent-rules/skill-standards.md`
+
+每次开启新 Phase 或新任务前，应快速扫描 `.agent-rules/agent-pre-read.md` 确认关键检查点。
 
 ## 3. 规则优先级
 
@@ -123,5 +125,6 @@
 - `.agent-rules/` 内容变化时，不要扩散到 `CLAUDE.md` / `README*.md` 详细描述
 - 新增技能集或工作流变化时，更新 [`skills-workflow.md`](./skills-workflow.md)
 - 修改技能结构、触发描述或包装方式时，遵守 [`skill-standards.md`](./skill-standards.md)
+- agent 预读指项目状态和底线变化时，更新 [`agent-pre-read.md`](./agent-pre-read.md)
 - 项目阶段变化时（如完成 Phase 4 或 5），更新本文件 §4
 - 项目背景变化时（如换远端、改许可证），更新 [`repo-context.md`](./repo-context.md)
