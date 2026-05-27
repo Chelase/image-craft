@@ -27,7 +27,7 @@
 
 ## 2. GEO Phase 5 专用工作流
 
-`docs/GEO.md` 中的任务按以下技能推进。所有 GEO 改动以 `docs/GEO.md` 为执行手册，**先在 docs/GEO.md 勾选 / 更新对应项再动手**。
+`project-docs/GEO.md` 中的任务按以下技能推进。所有 GEO 改动以 `project-docs/GEO.md` 为执行手册，**先在 project-docs/GEO.md 勾选 / 更新对应项再动手**。
 
 | GEO 子任务 | 使用技能 |
 |-----------|---------|
@@ -83,14 +83,14 @@ PowerShell 不应该重新实现 Python 已有的提示词处理逻辑——它�
 修改影响用户行为的功能时，按"单一事实来源"原则：
 
 - CLI 示例：同步 `README.md`、`README_CN.md`、`SKILL.md` 三处
-- ROADMAP 进度：更新 `docs/ROADMAP.md` 对应勾选
-- 新可被引用内容（新风格 / 新模板示例 / 新文档）：考虑是否影响 `docs/GEO.md` Phase 5.1 待办
+- ROADMAP 进度：更新 `project-docs/ROADMAP.md` 对应勾选
+- 新可被引用内容（新风格 / 新模板示例 / 新文档）：考虑是否影响 `project-docs/GEO.md` Phase 5.1 待办
 
 ### 3.5 GEO 内容产出
 
 为 GEO 写新文档（如 `docs/faq.md`、`docs/styles-guide.md` 等）时：
 
-- 在 `docs/GEO.md` 第五节"详细任务清单"勾选对应项
+- 在 `project-docs/GEO.md` 第五节"详细任务清单"勾选对应项
 - 中英文均需输出（双语同步原则同 §3.4）
 - 使用 §2 中 `searchfit-seo:*` 技能矩阵辅助
 - 注意"可引用信号"：加具体数字、引用权威来源、加版本号 + 更新日期
@@ -129,7 +129,7 @@ PowerShell 不应该重新实现 Python 已有的提示词处理逻辑——它�
 
 涉及 ROADMAP 范围内的任务：
 
-- 推进前在 `docs/ROADMAP.md` / `docs/GEO.md` 确认当前状态
+- 推进前在 `project-docs/ROADMAP.md` / `project-docs/GEO.md` 确认当前状态
 - 完成后**立即勾选**对应项，不要积压
 - 如发现 ROADMAP / GEO 与代码实际状态漂移，应顺手修正
 
@@ -148,4 +148,4 @@ PowerShell 不应该重新实现 Python 已有的提示词处理逻辑——它�
 - 项目阶段变化时（如完成 Phase 4 或 5），重新评估第 1-3 节
 - 新可用技能集应更新第 1-3 节推荐表
 - 禁止在 `CLAUDE.md` 等桥接文件扩散技能详细描述
-- GEO 任务列表与执行节奏的细化放 [`docs/GEO.md`](../docs/GEO.md)，本文件只声明"用哪个技能"
+- GEO 任务列表与执行节奏的细化放 [`project-docs/GEO.md`](../project-docs/GEO.md)，本文件只声明"用哪个技能"

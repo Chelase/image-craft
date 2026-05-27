@@ -14,8 +14,8 @@
 
 - `README.md` / `README_CN.md`（功能与使用背景，中英双语）
 - `SKILL.md`（技能元数据）
-- `docs/ROADMAP.md`（功能进度单一事实来源）
-- `docs/GEO.md`（GEO 工作单一事实来源）
+- `project-docs/ROADMAP.md`（功能进度单一事实来源）
+- `project-docs/GEO.md`（GEO 工作单一事实来源）
 
 附加约束：
 

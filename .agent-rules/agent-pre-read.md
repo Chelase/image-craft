@@ -4,8 +4,8 @@
 
 ## 1. 项目状态
 
-- [ ] 当前是 Phase 几？还在 roadmap 范围内吗？（`docs/ROADMAP.md`）
-- [ ] 如果有 GEO 相关工作，先读 `docs/GEO.md`
+- [ ] 当前是 Phase 几？还在 roadmap 范围内吗？（`project-docs/ROADMAP.md`）
+- [ ] 如果有 GEO 相关工作，先读 `project-docs/GEO.md`
 
 ## 2. 工作底线（`.agent-rules/README.md` §5）
 

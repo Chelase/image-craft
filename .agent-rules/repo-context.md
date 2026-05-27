@@ -10,14 +10,14 @@
 - **默认 API 端点**：`https://right.codes/draw`（见 `private_config.json.example`）
 - **默认模型**：`gpt-image-2`（可选 `gpt-image-2-vip`）
 - **配置优先级**：CLI 参数 > 环境变量 `IMAGE_CRAFT_*` > `private_config.json` > 默认值
-- **当前阶段**：Phase 4 进行中（详见 `docs/ROADMAP.md`），Phase 5 GEO 已启动（详见 `docs/GEO.md`）
+- **当前阶段**：Phase 4 进行中（详见 `project-docs/ROADMAP.md`），Phase 5 GEO 已启动（详见 `project-docs/GEO.md`）
 
 ## 关键单一事实来源
 
 | 内容 | 文件 |
 |------|------|
-| 功能开发进度 | `docs/ROADMAP.md` |
-| GEO 工作执行 | `docs/GEO.md` |
+| 功能开发进度 | `project-docs/ROADMAP.md` |
+| GEO 工作执行 | `project-docs/GEO.md` |
 | 技能能力描述（对外） | `SKILL.md` |
 | 项目级 agent 规则 | `.agent-rules/` |
 | CLI 参数定义 | `scripts/image_craft.py` 的 `build_parser` |
