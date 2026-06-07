@@ -239,14 +239,14 @@ python scripts/image_craft.py suggest "我想画一个未来城市"
 
 > 让 Agent 和用户知道当前技能版本，并在不打断图片生成主流程的前提下提示可用更新。
 
-- [ ] 以 `SKILL.md` frontmatter 中的 `version` 字段作为技能版本单一事实来源
-- [ ] 创建 `project-docs/CHANGELOG.md`，记录版本号、发布日期、关键变更和升级注意事项
-- [ ] 新增 `scripts/check_update.py`，读取本地版本并查询 GitHub tags / Releases 获取最新版本
-- [ ] 在 `generate` / `transform` 成功完成后触发更新检查；图片生成任务优先，检查失败不影响主任务退出码
-- [ ] 只有检测到远端存在新版本时才提示用户；无更新时保持安静输出
-- [ ] 对更新检查做低频缓存，例如 24 小时内最多检查一次，避免每次生成图片都访问网络
-- [ ] 默认只提示更新命令，不自动执行 `git pull` 或覆盖本地文件
-- [ ] 支持关闭更新检查：环境变量 `IMAGE_CRAFT_DISABLE_UPDATE_CHECK=1`，并考虑 CLI 参数 `--no-update-check`
+- [x] 以 `SKILL.md` frontmatter 中的 `version` 字段作为技能版本单一事实来源
+- [x] 创建 `project-docs/CHANGELOG.md`，记录版本号、发布日期、关键变更和升级注意事项
+- [x] 新增 `scripts/check_update.py`，读取本地版本并查询 GitHub tags / Releases 获取最新版本
+- [x] 在 `generate` / `transform` 成功完成后触发更新检查；图片生成任务优先，检查失败不影响主任务退出码
+- [x] 只有检测到远端存在新版本时才提示用户；无更新时保持安静输出
+- [x] 对更新检查做低频缓存，例如 24 小时内最多检查一次，避免每次生成图片都访问网络
+- [x] 默认只提示更新命令，不自动执行 `git pull` 或覆盖本地文件
+- [x] 支持关闭更新检查：环境变量 `IMAGE_CRAFT_DISABLE_UPDATE_CHECK=1`，并考虑 CLI 参数 `--no-update-check`
 - [ ] PowerShell 端通过 shell out 调用 Python 更新检查脚本，避免双端逻辑漂移
 - [ ] 未来发布 CLI 包时，同步规划 `pyproject.toml` / PyPI / `uvx` / `uv tool install`；npm / `npx` 仅作为跨 Node 生态分发选项
 
@@ -430,7 +430,7 @@ image-craft/
 | Phase 1 | 基础数据层 | ✅ |
 | Phase 2 | 搜索引擎 | ✅ |
 | Phase 3 | 集成与增强 | ✅ |
-| Phase 4 | 高级功能 | 4.1~4.6 ✅ / 4.7 ❌ |
+| Phase 4 | 高级功能 | 4.1~4.7 ✅（PowerShell 侧更新检查待做） |
 | Phase 5 | GEO 推广优化 | ❌ |
 
 ---

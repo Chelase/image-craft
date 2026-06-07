@@ -23,6 +23,7 @@ from payload_builder import (
     resolve_reference_images,
 )
 from prompts_enhancer import StyleWeight, enhance, is_simple_prompt, load_styles
+from check_update import check_for_update, format_update_message
 from search import (
     format_color,
     format_prompt,
@@ -149,6 +150,18 @@ def _download_image_url(url: str) -> str:
 def save_image(image_b64: str, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(base64.b64decode(image_b64))
+
+
+def _maybe_check_update(no_check: bool) -> None:
+    """Run update check unless disabled; print message to stderr."""
+    if no_check:
+        return
+    try:
+        info = check_for_update()
+        if info:
+            print(format_update_message(info), file=sys.stderr)
+    except Exception:
+        pass  # never let update check break the main flow
 
 
 def _parse_json_arg(value: str, arg_name: str) -> dict:
@@ -779,6 +792,7 @@ def generate(args: argparse.Namespace) -> None:
         output_info["negative_prompt"] = negative_prompt
 
     print(json.dumps(output_info, ensure_ascii=False))
+    _maybe_check_update(getattr(args, "no_update_check", False))
 
 
 def batch(args: argparse.Namespace) -> None:
@@ -817,6 +831,7 @@ def batch(args: argparse.Namespace) -> None:
         return
     for variant in plan["variants"]:
         print(f"{variant['ab_label']}: saved {variant['output']}")
+    _maybe_check_update(getattr(args, "no_update_check", False))
 
 
 def transform(args: argparse.Namespace) -> None:
@@ -897,6 +912,7 @@ def transform(args: argparse.Namespace) -> None:
         output_info["negative_prompt"] = negative_prompt
 
     print(json.dumps(output_info, ensure_ascii=False))
+    _maybe_check_update(getattr(args, "no_update_check", False))
 
 
 def suggest(args: argparse.Namespace) -> None:
@@ -1015,6 +1031,7 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--response-format", default=None, choices=["url", "b64_json"], help="API response format")
     gen.add_argument("--payload-json", default=None, help="Complete request body as JSON string (replaces profile-built payload)")
     gen.add_argument("--payload-merge", default=None, help="JSON to deep-merge into the profile-built payload")
+    gen.add_argument("--no-update-check", action="store_true", help="Skip update check after generation")
     gen.set_defaults(func=generate)
 
     # ----- batch -----
@@ -1036,6 +1053,7 @@ def build_parser() -> argparse.ArgumentParser:
     batch_parser.add_argument("--ban", default=None, help="Comma-separated custom ban terms appended to negative prompt")
     batch_parser.add_argument("--scene", default=None, help="Scene name for scene-specific negative prompt terms")
     batch_parser.add_argument("--dry-run", action="store_true", help="Print the batch plan without calling the image API")
+    batch_parser.add_argument("--no-update-check", action="store_true", help="Skip update check after generation")
     batch_parser.add_argument("-f", "--format", choices=["text", "json"], default="json")
     batch_parser.set_defaults(func=batch)
 
@@ -1076,6 +1094,7 @@ def build_parser() -> argparse.ArgumentParser:
     trans.add_argument("--response-format", default=None, choices=["url", "b64_json"], help="API response format")
     trans.add_argument("--payload-json", default=None, help="Complete request body as JSON string (replaces profile-built payload)")
     trans.add_argument("--payload-merge", default=None, help="JSON to deep-merge into the profile-built payload")
+    trans.add_argument("--no-update-check", action="store_true", help="Skip update check after transformation")
     trans.set_defaults(func=transform)
 
     # ----- suggest -----
